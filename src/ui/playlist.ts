@@ -399,6 +399,7 @@ export function createPlaylist(getState: () => AppState, actions: PlaylistAction
       const c = p.clips.find((x) => x.id === s.selectedClip);
       const pat = c && findPattern(p, c.patternId);
       selLabel.textContent = c && pat ? clipLabel(c, pat) : "No clip selected";
+      toolbar.dataset.empty = String(!(c && pat));
       for (const t of tools) setAttr(t, "aria-disabled", String(!c));
       addTrackBtn.hidden = p.tracks >= 32;
       playhead.hidden = s.mode !== "song" || lastStep < 0;

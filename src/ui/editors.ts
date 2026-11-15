@@ -6,9 +6,9 @@ import { maxBarsFor, pulseSteps, stepPosition, stepsPerBar } from "../core/timin
 import type { Channel, DrumPattern, MelodyPattern, Project } from "../core/types";
 import { numberField, segmented, toggle, trackHead, type TrackHead } from "./controls";
 import { h, setAttr } from "./dom";
-import { createFloatingWindow } from "./floatingWindow";
+import { createFloatingWindow, type FloatingWindow } from "./floatingWindow";
 import { createStepGrid, wherePhrase, type CellState, type StepGrid } from "./stepGrid";
-import type { AppState, DrawLength } from "./store";
+import { sectionOpen, type AppState, type DrawLength } from "./store";
 
 export interface CommonEditorActions {
   close(): void;
@@ -16,6 +16,32 @@ export interface CommonEditorActions {
   setBars(patternId: string, bars: number): void;
   clear(patternId: string): void;
   setZoom(px: number): void;
+  toggleOptions(open: boolean): void;
+}
+
+/**
+ * An Options button in the window's title bar that folds the editor's
+ * settings away, leaving the grid. `compactOnly`: the button only shows on
+ * phones (the drum editor, whose settings fit on a computer screen).
+ */
+function optionsToggle(win: FloatingWindow, actions: CommonEditorActions, compactOnly: boolean) {
+  const btn = h(
+    "button",
+    {
+      type: "button",
+      class: `btn btn-small win-options${compactOnly ? " compact-only" : ""}`,
+      "aria-expanded": "false",
+      title: "Show or hide this editor's settings",
+      onclick: () => actions.toggleOptions(btn.getAttribute("aria-expanded") !== "true"),
+    },
+    h("span", { class: "chevron", "aria-hidden": "true" }),
+    "Options",
+  );
+  win.tools.append(btn);
+  return (open: boolean) => {
+    setAttr(btn, "aria-expanded", String(open));
+    win.el.dataset.options = open ? "open" : "closed";
+  };
 }
 
 /** Name box, length in bars, zoom and Clear: the same in both editors. */
@@ -94,6 +120,7 @@ export interface DrumEditorActions extends CommonEditorActions {
 
 export function createDrumEditor(getState: () => AppState, actions: DrumEditorActions) {
   const win = createFloatingWindow({ className: "win-drums", x: 120, y: 150, onClose: actions.close });
+  const setOptions = optionsToggle(win, actions, true);
   const id = () => getState().openDrums;
   const pattern = () => findPattern(getState().project, id()) as DrumPattern | undefined;
   const controls = patternControls(actions, id);
@@ -164,6 +191,7 @@ export function createDrumEditor(getState: () => AppState, actions: DrumEditorAc
       }
       win.show();
       win.setTitle(`Drum loop: ${pat.name}`);
+      setOptions(sectionOpen(s.prefs, "editorOptions"));
       controls.update(s, pat);
       const drums = p.channels.filter((c) => c.kind === "drum");
       if (!grid || drums.map((c) => c.id).join() !== channels.map((c) => c.id).join()) build(drums);
@@ -236,6 +264,7 @@ export function drawSteps(value: DrawLength, project: Project): number {
 
 export function createRollEditor(getState: () => AppState, actions: RollEditorActions) {
   const win = createFloatingWindow({ className: "win-roll", x: 170, y: 190, onClose: actions.close });
+  const setOptions = optionsToggle(win, actions, false);
   const id = () => getState().openRoll;
   const pattern = () => findPattern(getState().project, id()) as MelodyPattern | undefined;
   const controls = patternControls(actions, id);
@@ -264,10 +293,11 @@ export function createRollEditor(getState: () => AppState, actions: RollEditorAc
     onChange: actions.setQuantize,
   });
   const keys = toggle({ label: "Computer keys", title: "Play notes with Z to M and Q to U", onChange: actions.setKeys });
+  keys.el.classList.add("touch-hide");
   const octaveLabel = h("span", { class: "octave-label", "aria-live": "polite" });
   const octave = h(
     "span",
-    { class: "octave", role: "group", "aria-label": "Keyboard octave" },
+    { class: "octave touch-hide", role: "group", "aria-label": "Keyboard octave" },
     h("button", { type: "button", class: "mini", "aria-label": "Octave down", title: "Octave down (-)", onclick: () => actions.shiftOctave(-1) }, "-"),
     octaveLabel,
     h("button", { type: "button", class: "mini", "aria-label": "Octave up", title: "Octave up (=)", onclick: () => actions.shiftOctave(1) }, "+"),
@@ -431,6 +461,7 @@ export function createRollEditor(getState: () => AppState, actions: RollEditorAc
       win.show();
       const ch = findChannel(p, pat.channelId);
       win.setTitle(`Piano roll: ${pat.name}`);
+      setOptions(sectionOpen(s.prefs, "editorOptions"));
       win.el.dataset.sound = ch?.sound ?? "lead";
       controls.update(s, pat);
 

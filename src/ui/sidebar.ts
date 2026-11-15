@@ -2,9 +2,9 @@ import { SYNTHS } from "../core/notes";
 import { DRUM_NAMES, findChannel, soundName } from "../core/project";
 import { audibleChannels } from "../core/schedule";
 import { DRUM_IDS, SYNTH_IDS, type Channel, type DrumId, type Project, type SynthId } from "../core/types";
-import { trackHead, type TrackHead } from "./controls";
+import { disclosure, trackHead, type TrackHead } from "./controls";
 import { h, setAttr } from "./dom";
-import type { AppState } from "./store";
+import { sectionOpen, type AppState, type SectionId } from "./store";
 
 export interface SidebarActions {
   addChannel(kind: "drum" | "synth", sound: DrumId | SynthId): void;
@@ -25,6 +25,7 @@ export interface SidebarActions {
   placePattern(id: string): void;
   duplicatePattern(id: string): void;
   deletePattern(id: string): void;
+  toggleSection(id: SectionId, open: boolean): void;
 }
 
 interface ChannelRow {
@@ -104,10 +105,8 @@ export function createSidebar(actions: SidebarActions) {
     "Add channel",
   );
 
-  const rack = h(
-    "section",
-    { class: "panel side-panel", "aria-labelledby": "rack-title" },
-    h("div", { class: "panel-head" }, h("h2", { id: "rack-title" }, "Channels")),
+  const rackFold = disclosure({ title: "Channels", onToggle: (open) => actions.toggleSection("channels", open) });
+  rackFold.body.append(
     list,
     h(
       "div",
@@ -117,13 +116,17 @@ export function createSidebar(actions: SidebarActions) {
       h("button", { type: "button", class: "btn btn-small", title: "Add any 808 kit sounds this song does not have yet", onclick: () => actions.addKit808() }, "Add 808 kit"),
     ),
   );
+  const rack = h(
+    "section",
+    { class: "panel side-panel", "aria-labelledby": rackFold.titleId },
+    h("div", { class: "panel-head" }, h("h2", {}, rackFold.button)),
+    rackFold.body,
+  );
 
   /* ---------- Pattern list ---------- */
   const patList = h("ul", { class: "pattern-list", role: "list" });
-  const patterns = h(
-    "section",
-    { class: "panel side-panel", "aria-labelledby": "patterns-title" },
-    h("div", { class: "panel-head" }, h("h2", { id: "patterns-title" }, "Patterns")),
+  const patFold = disclosure({ title: "Patterns", onToggle: (open) => actions.toggleSection("patterns", open) });
+  patFold.body.append(
     patList,
     h(
       "div",
@@ -131,6 +134,12 @@ export function createSidebar(actions: SidebarActions) {
       h("button", { type: "button", class: "btn btn-small", onclick: () => actions.newDrums() }, "New drum loop"),
       h("button", { type: "button", class: "btn btn-small", onclick: () => actions.newMelody() }, "New melody"),
     ),
+  );
+  const patterns = h(
+    "section",
+    { class: "panel side-panel", "aria-labelledby": patFold.titleId },
+    h("div", { class: "panel-head" }, h("h2", {}, patFold.button)),
+    patFold.body,
   );
 
   let shownPatterns: unknown = null;
@@ -200,6 +209,7 @@ export function createSidebar(actions: SidebarActions) {
     el: h("div", { class: "sidebar" }, patterns, rack),
     /** F6: put focus in the channel rack. */
     focusRack() {
+      actions.toggleSection("channels", true);
       (list.querySelector(".channel-name") as HTMLElement | null)?.focus();
       rack.scrollIntoView({ block: "nearest" });
     },
@@ -239,6 +249,10 @@ export function createSidebar(actions: SidebarActions) {
         if (soundName(ch) !== ch.name) row.el.title = `${ch.name} (${soundName(ch)})`;
       });
       renderPatterns(p, s.current);
+      // While folded, the heading still says what is inside.
+      const cur = p.patterns.find((x) => x.id === s.current);
+      patFold.set(sectionOpen(s.prefs, "patterns"), `${p.patterns.length}${cur ? `, ${cur.name} selected` : ""}`);
+      rackFold.set(sectionOpen(s.prefs, "channels"), String(p.channels.length));
     },
   };
 }

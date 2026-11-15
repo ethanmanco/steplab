@@ -250,3 +250,38 @@ export function slider(opts: {
     },
   };
 }
+
+/**
+ * A heading that folds its section away. The button says whether the section
+ * is open (aria-expanded), and a short summary shows what is inside while it
+ * is folded.
+ */
+export function disclosure(opts: { title: string; onToggle: (open: boolean) => void }) {
+  const bodyId = nextId("sec");
+  const titleId = nextId("sec-title");
+  const summary = h("span", { class: "disclosure-summary" });
+  const button = h(
+    "button",
+    {
+      type: "button",
+      class: "disclosure",
+      "aria-expanded": "true",
+      "aria-controls": bodyId,
+      onclick: () => opts.onToggle(button.getAttribute("aria-expanded") !== "true"),
+    },
+    h("span", { class: "chevron", "aria-hidden": "true" }),
+    h("span", { id: titleId, class: "disclosure-title" }, opts.title),
+    summary,
+  );
+  const body = h("div", { id: bodyId, class: "disclosure-body" });
+  return {
+    button,
+    body,
+    titleId,
+    set(open: boolean, text = "") {
+      setAttr(button, "aria-expanded", String(open));
+      body.hidden = !open;
+      if (summary.textContent !== text) summary.textContent = text;
+    },
+  };
+}

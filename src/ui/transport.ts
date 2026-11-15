@@ -65,7 +65,10 @@ export function createTransport(actions: TransportActions) {
     oninput: () => actions.setBpm(Number(range.value)),
   });
   const bpm = numberField({ label: "Tempo in beats per minute", min: MIN_BPM, max: MAX_BPM, className: "num-3", onCommit: actions.setBpm });
-  const tempo = h("div", { class: "field" }, h("span", { class: "field-label", "aria-hidden": "true" }, "Tempo"), range, bpm.el, h("span", { class: "unit", "aria-hidden": "true" }, "BPM"));
+  // The typed tempo sits in the main row; the slider folds away with the other song settings.
+  const tempo = h("div", { class: "field field-bpm" }, bpm.el, h("span", { class: "unit", "aria-hidden": "true" }, "BPM"));
+  const rangeOut = h("span", { class: "unit range-out", "aria-hidden": "true" });
+  const tempoSlider = h("div", { class: "field" }, h("span", { class: "field-label", "aria-hidden": "true" }, "Tempo"), range, rangeOut);
 
   let sig: TimeSignature = { beats: 4, unit: 4 };
   const beats = numberField({
@@ -110,16 +113,10 @@ export function createTransport(actions: TransportActions) {
 
   const status = h("p", { class: "sr-only", role: "status", "aria-live": "polite" });
 
-  const el = h(
-    "div",
-    { class: "transport", role: "group", "aria-label": "Transport" },
-    h("div", { class: "transport-buttons" }, play, stop, record, metro),
-    mode.el,
-    tempo,
-    meter,
-    swingField,
-    status,
-  );
+  const buttons = h("div", { class: "transport-buttons", role: "group", "aria-label": "Transport" }, play, stop, record);
+  const el = h("div", { class: "transport" }, buttons, metro, mode.el, tempo, status);
+  /** Tempo slider, time signature and swing: set once per song, so they live in the More panel. */
+  const songSettings = h("div", { class: "song-settings", role: "group", "aria-label": "Song settings" }, tempoSlider, meter, swingField);
 
   const STATUS: Record<AppState["playState"], string> = {
     stopped: "Stopped",
@@ -131,6 +128,10 @@ export function createTransport(actions: TransportActions) {
 
   return {
     el,
+    buttons,
+    metro,
+    mode: mode.el,
+    songSettings,
     focusPlay: () => play.focus(),
     update(s: AppState) {
       const { project } = s;
@@ -147,6 +148,7 @@ export function createTransport(actions: TransportActions) {
 
       if (range.value !== String(project.bpm)) range.value = String(project.bpm);
       setAttr(range, "aria-valuetext", `${project.bpm} BPM`);
+      rangeOut.textContent = `${project.bpm} BPM`;
       bpm.set(project.bpm);
       sig = project.timeSig;
       beats.set(sig.beats);

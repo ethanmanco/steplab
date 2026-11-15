@@ -30,6 +30,31 @@ export interface Prefs {
   recordWith: "alone" | "backing" | "song";
   /** Volume of everything except the recorded channel while recording, 0..1. */
   backingLevel: number;
+  /** Which collapsible sections you opened or closed. Missing ones use the default for the screen. */
+  sections: Partial<Record<SectionId, boolean>>;
+}
+
+/** Phones: one column, and everything that can fold away starts folded. */
+export const COMPACT_QUERY = "(max-width: 720px)";
+/** Phones and tablets: the play and record dock with the on-screen keyboard. */
+export const TOUCH_QUERY = "(max-width: 720px), (pointer: coarse)";
+
+export type SectionId = "patterns" | "channels" | "editorOptions" | "keyboard";
+
+const matches = (query: string) => typeof window !== "undefined" && window.matchMedia(query).matches;
+export const isCompact = () => matches(COMPACT_QUERY);
+export const isTouch = () => matches(TOUCH_QUERY);
+
+/**
+ * Whether a collapsible section is open. On phones everything starts folded,
+ * so the playlist and the play and record dock get the screen. On a computer
+ * the sidebar starts open; editor options and the on-screen keyboard start
+ * folded everywhere.
+ */
+export function sectionOpen(prefs: Prefs, id: SectionId): boolean {
+  const chosen = prefs.sections[id];
+  if (typeof chosen === "boolean") return chosen;
+  return (id === "patterns" || id === "channels") && !isCompact();
 }
 
 export interface AppState {

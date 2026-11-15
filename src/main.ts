@@ -72,7 +72,16 @@ import { createPlaylist } from "./ui/playlist";
 import { createSidebar } from "./ui/sidebar";
 import { paintStarfield } from "./ui/space";
 import { showStartOverlay } from "./ui/startOverlay";
-import { createStore, type AppState, type Prefs } from "./ui/store";
+import {
+  COMPACT_QUERY,
+  TOUCH_QUERY,
+  createStore,
+  sectionOpen,
+  type AppState,
+  type Prefs,
+  type SectionId,
+} from "./ui/store";
+import { createDock } from "./ui/dock";
 import { createTransport } from "./ui/transport";
 
 const storage = getStorage();
@@ -90,6 +99,7 @@ const DEFAULT_PREFS: Prefs = {
   snap: "bar",
   recordWith: "backing",
   backingLevel: 0.7,
+  sections: {},
 };
 /** Settings come from storage, so make sure the choice-type ones hold a real choice. */
 function cleanPrefs(p: Prefs): Prefs {
@@ -100,6 +110,9 @@ function cleanPrefs(p: Prefs): Prefs {
     sidebarWidth: Math.min(640, Math.max(240, p.sidebarWidth || 320)),
     recordWith: ["alone", "backing", "song"].includes(p.recordWith) ? p.recordWith : "backing",
     backingLevel: Math.min(1, Math.max(0, Number.isFinite(p.backingLevel) ? p.backingLevel : 0.7)),
+    sections: Object.fromEntries(
+      Object.entries(p.sections && typeof p.sections === "object" ? p.sections : {}).filter(([, v]) => typeof v === "boolean"),
+    ),
   };
 }
 const initialProject = loadAutosave(storage) ?? defaultBeat();
@@ -188,6 +201,10 @@ function replaceProject(p: Project) {
 function setPrefs(patch: Partial<Prefs>) {
   store.set((s) => ({ prefs: { ...s.prefs, ...patch } }));
   savePrefs(storage, store.get().prefs);
+}
+/** Open or fold a collapsible section, and remember the choice. */
+function toggleSection(id: SectionId, open: boolean) {
+  setPrefs({ sections: { ...store.get().prefs.sections, [id]: open } });
 }
 
 /** Open a pattern's editor window and make it the current pattern. */
@@ -314,6 +331,11 @@ const mixActions = {
   setVolume: (id: string, volume: number) => edit((p) => setChannelMix(p, id, { volume }), `vol-${id}`),
 };
 
+function newMelody() {
+  const { project: withPattern, id } = addMelodyPattern(project(), recordTarget()?.channelId);
+  if (id) addAndPlace(withPattern, id, { openRoll: id });
+}
+
 const sidebar = createSidebar({
   ...mixActions,
   addChannel(kind, sound) {
@@ -377,10 +399,8 @@ const sidebar = createSidebar({
     const { project: withPattern, id } = addDrumPattern(project());
     addAndPlace(withPattern, id, { openDrums: id });
   },
-  newMelody() {
-    const { project: withPattern, id } = addMelodyPattern(project(), recordTarget()?.channelId);
-    if (id) addAndPlace(withPattern, id, { openRoll: id });
-  },
+  newMelody,
+  toggleSection,
   selectPattern: (id) => store.set({ current: id }),
   editPattern: openPattern,
   placePattern: place,
@@ -457,6 +477,7 @@ const common = {
   setBars: (id: string, bars: number) => edit((p) => setPatternBars(p, id, bars)),
   clear: (id: string) => edit((p) => clearPattern(p, id)),
   setZoom: (zoom: number) => setPrefs({ zoom }),
+  toggleOptions: (open: boolean) => toggleSection("editorOptions", open),
 };
 
 const drumEditor = createDrumEditor(() => store.get(), {
@@ -902,30 +923,97 @@ splitter.addEventListener("keydown", (e) => {
   }
 });
 
+/* ---------- Top bar, More panel and the phone dock ---------- */
+
+// The top bar keeps what you reach for while working: play, the mode, the
+// tempo, undo. Song settings and file buttons fold into the More panel.
+const morePanel = h("div", { id: "more-panel", class: "more-panel", hidden: true });
+const moreBtn = h(
+  "button",
+  {
+    type: "button",
+    class: "btn btn-small btn-more",
+    "aria-expanded": "false",
+    "aria-controls": "more-panel",
+    onclick: () => {
+      const open = morePanel.hidden;
+      morePanel.hidden = !open;
+      moreBtn.setAttribute("aria-expanded", String(open));
+    },
+  },
+  h("span", { class: "chevron", "aria-hidden": "true" }),
+  "More",
+);
+const topTools = h("span", { class: "top-tools" }, files.history, examplesBtn, mixerBtn, moreBtn);
+const moreTools = h("div", { class: "more-tools" }, layoutSeg.el, helpBtn);
+layoutSeg.el.classList.add("touch-hide");
+helpBtn.classList.add("touch-hide");
+transport.metro.append(h("span", { class: "metro-text" }, "Metronome"));
+const group = (label: string, ...children: Node[]) =>
+  h("div", { class: "more-group", role: "group", "aria-label": label }, h("span", { class: "more-label", "aria-hidden": "true" }, label), ...children);
+morePanel.append(group("Song", transport.songSettings), group("File", files.el), group("Tools", moreTools));
+
+const dock = createDock({
+  noteDown: (id, pitch) => noteDown(id, pitch, DEFAULT_VELOCITY),
+  noteUp,
+  shiftOctave: (dir) => setPrefs({ keysBase: shiftOctave(store.get().prefs.keysBase, dir) }),
+  setKeyboardOpen: (open) => toggleSection("keyboard", open),
+  selectMelody: (id) => store.set((s) => ({ current: id, openRoll: s.openRoll ? id : null, backing: null })),
+  newMelody,
+});
+// Pages scroll under the dock, so leave room for it at the bottom.
+new ResizeObserver(() => document.documentElement.style.setProperty("--dock-h", `${dock.el.offsetHeight}px`)).observe(dock.el);
+
+/**
+ * One set of controls, moved to where they fit the screen. On phones and
+ * tablets Play, Stop and Record live in the dock at the bottom; on phones the
+ * mode switch joins them, and Examples, Mixer and the metronome fold into
+ * More.
+ */
+const compactQuery = window.matchMedia(COMPACT_QUERY);
+const touchQuery = window.matchMedia(TOUCH_QUERY);
+function placeControls() {
+  const compact = compactQuery.matches;
+  const bpmField = transport.el.querySelector(".field-bpm")!;
+  if (touchQuery.matches) dock.bar.insertBefore(transport.buttons, dock.tools);
+  else transport.el.insertBefore(transport.buttons, bpmField);
+  if (compact) {
+    moreTools.prepend(examplesBtn, mixerBtn, transport.metro);
+    dock.bar.insertBefore(transport.mode, dock.tools);
+  } else {
+    topTools.insertBefore(examplesBtn, moreBtn);
+    topTools.insertBefore(mixerBtn, moreBtn);
+    transport.el.insertBefore(transport.metro, bpmField);
+    transport.el.insertBefore(transport.mode, bpmField);
+  }
+}
+placeControls();
+// Crossing between phone and computer sizes moves controls and changes which sections start open.
+for (const query of [compactQuery, touchQuery]) {
+  query.addEventListener("change", () => {
+    placeControls();
+    render();
+  });
+}
+
 const app = document.getElementById("app")!;
 app.append(
   h(
     "header",
     { class: "top" },
-    h(
-      "div",
-      { class: "brand" },
-      h("span", { class: "logo", "aria-hidden": "true" }, "Steplab"),
-      h("span", { class: "brand-tools" }, layoutSeg.el, examplesBtn, mixerBtn, helpBtn),
-      files.el,
-    ),
-    transport.el,
+    h("div", { class: "top-row" }, h("span", { class: "logo", "aria-hidden": "true" }, "Steplab"), transport.el, topTools),
+    morePanel,
   ),
   workspace,
   h(
     "footer",
     { class: "foot" },
-    h("p", {}, "FL Studio shortcuts work here: ", h("kbd", {}, "Space"), " play, ", h("kbd", {}, "R"), " record, ", h("kbd", {}, "L"), " pattern or song, ", h("kbd", {}, "Alt"), " + drag to skip snapping. Press ", h("kbd", {}, "F1"), " for the full list."),
+    h("p", { class: "touch-hide" }, "FL Studio shortcuts work here: ", h("kbd", {}, "Space"), " play, ", h("kbd", {}, "R"), " record, ", h("kbd", {}, "L"), " pattern or song, ", h("kbd", {}, "Alt"), " + drag to skip snapping. Press ", h("kbd", {}, "F1"), " for the full list."),
     h("p", { class: "foot-save" }, "Your song autosaves in this browser."),
   ),
   toast.el,
 );
-document.body.append(drumEditor.win.el, rollEditor.win.el, helpWin.el, channelSettings.win.el, mixer.win.el, examplesWin.el, audioInput);
+document.body.append(dock.el, drumEditor.win.el, rollEditor.win.el, helpWin.el, channelSettings.win.el, mixer.win.el, examplesWin.el, audioInput);
 paintStarfield();
 
 function render() {
@@ -938,6 +1026,16 @@ function render() {
   channelSettings.update(s);
   mixer.update(s);
   mixerBtn.setAttribute("aria-pressed", String(s.mixerOpen));
+  const target = recordTarget(s);
+  const liveId = liveChannel();
+  dock.update({
+    keyboardOpen: sectionOpen(s.prefs, "keyboard"),
+    base: s.prefs.keysBase,
+    melodies: s.project.patterns.filter((x): x is MelodyPattern => x.kind === "melody"),
+    target,
+    sound: (liveId && findChannel(s.project, liveId)?.name) || "",
+    recordArmed: s.recordArmed,
+  });
   files.setHistory(s.canUndo, s.canRedo);
   layoutSeg.setValue(s.prefs.layout);
   workspace.dataset.layout = s.prefs.layout;

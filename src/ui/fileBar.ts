@@ -49,10 +49,11 @@ export function createFileBar(actions: FileActions) {
     if (redoBtn.getAttribute("aria-disabled") !== "true") actions.redo();
   });
 
+  // Undo and redo stay in the main row; the file buttons fold into the More panel.
+  const history = h("span", { class: "btn-pair", role: "group", "aria-label": "History" }, undoBtn, redoBtn);
   const el = h(
     "div",
-    { class: "files", role: "group", "aria-label": "Project" },
-    h("span", { class: "btn-pair" }, undoBtn, redoBtn),
+    { class: "files", role: "group", "aria-label": "Project file" },
     btn("New", "New project", actions.newProject),
     btn("Open", "Open a project file, or a MIDI file to add to the song", () => input.click()),
     btn("Save", "Save project file", actions.saveFile),
@@ -62,6 +63,7 @@ export function createFileBar(actions: FileActions) {
   );
   return {
     el,
+    history,
     /** Open the file picker, for Ctrl+O. */
     pickFile: () => input.click(),
     setHistory(canUndo: boolean, canRedo: boolean) {

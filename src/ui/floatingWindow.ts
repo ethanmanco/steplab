@@ -120,3 +120,5 @@ export function createFloatingWindow(opts: {
     },
   };
 }
+
+export type FloatingWindow = ReturnType<typeof createFloatingWindow>;

@@ -133,11 +133,135 @@ select {
   border-bottom: 1px solid var(--edge);
 }
 
-.brand {
+/* One row: logo, transport, then undo and the tools. The rest folds into More. */
+.top-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 20px;
+}
+
+.top-tools {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.more-panel {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--edge);
+}
+
+.more-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+
+.more-label {
+  min-width: 4.5em;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.song-settings,
+.more-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+}
+
+.more-tools {
+  gap: 8px;
+}
+
+.metro-text {
+  display: none;
+}
+
+.more-panel .metro-text {
+  display: inline;
+}
+
+.range-out {
+  min-width: 4.6em;
+}
+
+/* A small triangle that turns down when its section is open. */
+.chevron {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 6px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 120ms ease;
+}
+
+[aria-expanded="true"] > .chevron {
+  transform: rotate(90deg);
+}
+
+.disclosure {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.disclosure-summary {
+  margin-left: auto;
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-soft);
+}
+
+.disclosure[aria-expanded="true"] .disclosure-summary {
+  display: none;
+}
+
+.side-panel:has(.disclosure[aria-expanded="false"]) {
+  padding: 4px 0;
+}
+
+.side-panel:has(.disclosure[aria-expanded="false"]) .panel-head {
+  padding-bottom: 0;
+}
+
+.win-options {
+  min-height: 30px;
+  gap: 8px;
+}
+
+/* Editor settings fold away with the Options button. */
+.win[data-options="closed"] .record-row {
+  display: none;
+}
+
+.compact-only {
+  display: none;
 }
 
 .main {
@@ -250,7 +374,6 @@ select {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-left: auto;
 }
 
 .field {
@@ -1577,7 +1700,7 @@ kbd {
 .start {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 10000;
   display: grid;
   place-items: center;
   padding: 16px;
@@ -1658,9 +1781,6 @@ kbd {
   .logo {
     font-size: 1.15rem;
   }
-  .files {
-    margin-left: 0;
-  }
   .transport {
     gap: 10px 16px;
   }
@@ -1676,12 +1796,12 @@ kbd {
     flex-basis: var(--key-w);
     width: var(--key-w);
   }
-  /* Editor windows fill the screen on phones. */
+  /* Editor windows fill the screen on phones, above the dock. */
   .win,
   .win[data-layout] {
-    inset: 0 !important;
+    inset: 0 0 auto 0 !important;
     width: 100vw !important;
-    height: 100dvh !important;
+    height: calc(100dvh - var(--dock-h, 0px)) !important;
     max-width: none;
     max-height: none;
     border-radius: 0;
@@ -1693,6 +1813,213 @@ kbd {
   .pl-help {
     display: none;
   }
+  .logo {
+    font-size: 1rem;
+    letter-spacing: 0.24em;
+  }
+  .top-row {
+    gap: 8px;
+  }
+  /* The tempo is in More on phones, with its slider. */
+  .field-bpm {
+    display: none;
+  }
+  .compact-only {
+    display: inline-flex;
+  }
+  .compact-hide {
+    display: none !important;
+  }
+  .win[data-options="closed"] .editor-controls {
+    display: none;
+  }
+  .clip-toolbar[data-empty="true"] {
+    display: none;
+  }
+  .more-label {
+    flex-basis: 100%;
+  }
+  .dock .transport-buttons .btn > span {
+    display: none;
+  }
+  .dock .transport-buttons .btn {
+    justify-content: center;
+    min-width: 46px;
+    padding: 0 10px;
+  }
+  .dock-bar,
+  .dock .transport-buttons {
+    gap: 6px;
+  }
+  .dock .btn-keys {
+    gap: 6px;
+    padding: 0 10px;
+  }
+}
+
+/* ---------- Phones and tablets: the play and record dock ---------- */
+
+.dock {
+  display: none;
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .touch-hide {
+    display: none !important;
+  }
+  .dock {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9000;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    background: rgba(8, 8, 11, 0.94);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--edge);
+  }
+  .app {
+    padding-bottom: calc(var(--dock-h, 0px) + 24px);
+  }
+  .toast {
+    bottom: calc(var(--dock-h, 0px) + 12px);
+  }
+}
+
+/* Tablets: floating windows stop above the dock. (Phones fill the screen instead.) */
+@media (pointer: coarse) and (min-width: 721px) {
+  .win[data-layout="auto"],
+  .win:not([data-layout]) {
+    max-height: calc(100dvh - var(--dock-h, 0px) - 24px);
+  }
+}
+
+.dock-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dock-tools {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.btn-keys.is-on {
+  background: rgba(157, 184, 255, 0.22);
+  border-color: var(--focus);
+}
+
+/* A tiny keyboard drawn with a gradient: white keys with dark gaps. */
+.keys-icon {
+  width: 18px;
+  height: 13px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, transparent 0 3.5px, currentColor 3.5px 5px);
+}
+
+.dock-keys {
+  padding-bottom: 8px;
+}
+
+.dock-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.dock-melody {
+  max-width: 46%;
+  min-height: 36px;
+}
+
+.dock-rec-note {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dock-rec-note.is-rec {
+  color: var(--c-rec);
+  font-weight: 700;
+}
+
+.dock .octave .mini {
+  height: 36px;
+  min-width: 36px;
+}
+
+.dock .octave-label {
+  min-width: 8.5ch;
+}
+
+/* The on-screen keyboard. Every key is a real button for screen readers, but
+   fingers are tracked on the whole keyboard so a slide moves between keys. */
+.piano {
+  display: grid;
+  gap: 6px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.piano-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--whites), minmax(0, 1fr));
+  height: 82px;
+}
+
+.pkey {
+  grid-row: 1;
+  grid-column: calc(var(--at) + 1);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  margin: 0 1px;
+  padding: 0 0 5px;
+  border: 0;
+  border-radius: 0 0 7px 7px;
+  background: linear-gradient(#f4f4f7, #dcdce3);
+  color: #3a3a44;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+.pkey-black {
+  /* Placed across the whole row, not inside a grid column. */
+  grid-column: auto;
+  grid-row: auto;
+  position: absolute;
+  top: 0;
+  left: calc(var(--at) * 100% / var(--whites));
+  z-index: 1;
+  width: calc(100% / var(--whites) * 0.62);
+  height: 58%;
+  margin: 0;
+  transform: translateX(-50%);
+  border-radius: 0 0 5px 5px;
+  background: linear-gradient(#26262e, #101015);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.pkey.is-down {
+  background: var(--focus);
+}
+
+.pkey-black.is-down {
+  background: #6f84d6;
 }
 
 /* ---------- Reduced motion: nothing slides or blinks ---------- */
@@ -1930,4 +2257,10 @@ kbd {
   margin: 0;
   font-size: 0.8rem;
   color: var(--ink-soft);
+}
+
+.more-panel .btn {
+  min-height: 36px;
+  padding: 0 11px;
+  font-size: 0.85rem;
 }
