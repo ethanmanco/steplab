@@ -710,6 +710,44 @@ input[type="range"] {
   box-shadow: 0 -2px 0 var(--line);
 }
 
+/* ---------- Project buttons and messages ---------- */
+
+.files {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  z-index: 50;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 10px 16px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 3px 3px 0 var(--shadow);
+  font-weight: 700;
+  transform: translate(-50%, 160%);
+  opacity: 0;
+  transition:
+    transform 180ms ease,
+    opacity 180ms ease;
+  pointer-events: none;
+}
+
+.toast.show {
+  transform: translate(-50%, 0);
+  opacity: 1;
+}
+
+.toast[data-kind="error"] {
+  border-color: var(--c-kick);
+}
+
 /* ---------- Footer ---------- */
 
 .foot {
@@ -723,6 +761,10 @@ input[type="range"] {
 
 .foot p {
   margin: 0;
+}
+
+.foot-save {
+  flex-basis: 100%;
 }
 
 kbd {

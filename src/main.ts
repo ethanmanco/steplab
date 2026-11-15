@@ -4,6 +4,7 @@ import {
   clearDrums,
   clearMelody,
   demoProject,
+  emptyProject,
   setBpm,
   setLoopBars,
   setSynth,
@@ -11,15 +12,19 @@ import {
   toggleDrumStep,
   toggleNote,
 } from "./core/project";
+import { parseProject, serializeProject } from "./core/serialize";
 import type { Project } from "./core/types";
+import { debounce, getStorage, loadAutosave, saveAutosave } from "./storage";
 import { createDrumGrid } from "./ui/drumGrid";
 import { h } from "./ui/dom";
+import { createFileBar, createToast, dateStamp, downloadBlob } from "./ui/fileBar";
 import { createMelodyPanel } from "./ui/melodyPanel";
 import { showStartOverlay } from "./ui/startOverlay";
 import { createStore } from "./ui/store";
 import { createTransport } from "./ui/transport";
 
-const initialProject = demoProject();
+const storage = getStorage();
+const initialProject = loadAutosave(storage) ?? demoProject();
 const store = createStore({ project: initialProject, playing: false, editBar: 0, activeMelody: 0 });
 const engine = new Engine(initialProject);
 
@@ -74,6 +79,50 @@ const melody = createMelodyPanel({
   clear: (track) => updateProject((p) => clearMelody(p, track)),
 });
 
+const toast = createToast();
+
+/** Swap in a whole new project (New or Open). */
+function replaceProject(project: Project) {
+  store.set({ project, editBar: 0 });
+}
+
+const files = createFileBar({
+  newProject() {
+    const ok = window.confirm(
+      "Start a new empty project? This replaces the current beat. Save it first if you want to keep it.",
+    );
+    if (!ok) return;
+    replaceProject(emptyProject());
+    toast.show("New empty project.");
+  },
+  async openFile(file) {
+    if (file.size > 1_000_000) {
+      toast.show("That file is too big to be a Steplab project.", "error");
+      return;
+    }
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      toast.show("That file could not be read.", "error");
+      return;
+    }
+    const result = parseProject(text);
+    if (!result.ok) {
+      toast.show(result.error, "error");
+      return;
+    }
+    replaceProject(result.project);
+    toast.show(`Opened ${file.name}.`);
+  },
+  saveFile() {
+    const name = `steplab-${dateStamp()}.json`;
+    const blob = new Blob([serializeProject(store.get().project, true)], { type: "application/json" });
+    downloadBlob(blob, name);
+    toast.show(`Saved ${name}.`);
+  },
+});
+
 engine.setStepListener((step) => {
   drums.setPlayhead(step);
   melody.setPlayhead(step);
@@ -86,6 +135,7 @@ app.append(
     { class: "top" },
     h("div", { class: "brand" }, h("span", { class: "logo", "aria-hidden": "true" }, "Steplab")),
     transport.el,
+    files.el,
   ),
   h(
     "main",
@@ -106,7 +156,9 @@ app.append(
     h("p", {}, h("kbd", {}, "Arrows"), " move in a grid"),
     h("p", {}, h("kbd", {}, "Space"), " toggle a step"),
     h("p", {}, h("kbd", {}, "["), " ", h("kbd", {}, "]"), " change bar"),
+    h("p", { class: "foot-save" }, "Your beat autosaves in this browser."),
   ),
+  toast.el,
 );
 
 function render() {
@@ -115,8 +167,25 @@ function render() {
   drums.update(s);
   melody.update(s);
 }
+
+// Autosave: quietly after each pause in editing, and right away when the tab is hidden.
+let autosaveWarned = false;
+function autosaveNow(project: Project) {
+  if (saveAutosave(storage, project) || autosaveWarned) return;
+  autosaveWarned = true;
+  document.querySelector(".foot-save")?.replaceChildren("Autosave is off in this browser. Use Save to keep your beat.");
+  toast.show("Autosave is off in this browser. Use Save to keep your beat.", "error");
+}
+const autosave = debounce(autosaveNow, 400);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") autosave.flush(store.get().project);
+});
+
 store.subscribe((s, prev) => {
-  if (s.project !== prev.project) engine.setProject(s.project);
+  if (s.project !== prev.project) {
+    engine.setProject(s.project);
+    autosave(s.project);
+  }
   render();
 });
 render();
