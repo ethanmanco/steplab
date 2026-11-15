@@ -5,6 +5,8 @@ export interface FileActions {
   openFile(file: File): void;
   saveFile(): void;
   exportWav?: () => Promise<void>;
+  undo(): void;
+  redo(): void;
 }
 
 /** Project file buttons: New, Open, Save, and WAV export. */
@@ -38,16 +40,31 @@ export function createFileBar(actions: FileActions) {
     }
   });
 
+  // aria-disabled instead of disabled, so focus is not lost when undo runs out.
+  const undoBtn = btn("Undo", "Undo (Ctrl+Z)", () => {
+    if (undoBtn.getAttribute("aria-disabled") !== "true") actions.undo();
+  });
+  const redoBtn = btn("Redo", "Redo (Ctrl+Shift+Z)", () => {
+    if (redoBtn.getAttribute("aria-disabled") !== "true") actions.redo();
+  });
+
   const el = h(
     "div",
     { class: "files", role: "group", "aria-label": "Project" },
+    h("span", { class: "btn-pair" }, undoBtn, redoBtn),
     btn("New", "New project", actions.newProject),
     btn("Open", "Open project file", () => input.click()),
     btn("Save", "Save project file", actions.saveFile),
     exportWav ? wav : null,
     input,
   );
-  return { el };
+  return {
+    el,
+    setHistory(canUndo: boolean, canRedo: boolean) {
+      undoBtn.setAttribute("aria-disabled", String(!canUndo));
+      redoBtn.setAttribute("aria-disabled", String(!canRedo));
+    },
+  };
 }
 
 /** A short message at the bottom of the screen, also read by screen readers. */

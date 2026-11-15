@@ -1,12 +1,33 @@
+import type { PlayState } from "../audio/engine";
 import type { Project } from "../core/types";
+import type { DrawLength } from "./melodyPanel";
+
+/** Settings that belong to the person, not the song. Kept between visits. */
+export interface Prefs {
+  metronome: boolean;
+  countIn: boolean;
+  /** Recording snap grid, in steps. */
+  quantize: number;
+  /** Play notes with the computer keyboard. */
+  keys: boolean;
+  /** MIDI note of the Z key. */
+  keysBase: number;
+  /** Step width in pixels. */
+  zoom: number;
+  /** Scroll the grids along with the playhead. */
+  follow: boolean;
+}
 
 export interface AppState {
   project: Project;
-  playing: boolean;
-  /** Which bar of the loop the grids are showing (0-based). */
-  editBar: number;
+  playState: PlayState;
+  recordArmed: boolean;
   /** Which melody track the piano roll is showing. */
   activeMelody: number;
+  drawLength: DrawLength;
+  prefs: Prefs;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 type Listener = (state: AppState, prev: AppState) => void;

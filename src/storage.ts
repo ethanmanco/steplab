@@ -41,6 +41,32 @@ export function saveAutosave(storage: WriteStore | null, project: Project): bool
   }
 }
 
+export const PREFS_KEY = "steplab:prefs";
+
+/** Read saved settings over the defaults, keeping only known keys of the right type. */
+export function loadPrefs<T extends object>(storage: ReadStore | null, defaults: T): T {
+  if (!storage) return defaults;
+  try {
+    const raw = JSON.parse(storage.getItem(PREFS_KEY) ?? "{}") as Record<string, unknown>;
+    const out = { ...defaults } as Record<string, unknown>;
+    for (const [k, v] of Object.entries(defaults)) {
+      if (typeof raw[k] === typeof v) out[k] = raw[k];
+    }
+    return out as T;
+  } catch {
+    return defaults;
+  }
+}
+
+export function savePrefs(storage: WriteStore | null, prefs: object): void {
+  if (!storage) return;
+  try {
+    storage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // Settings are a convenience; losing them is fine.
+  }
+}
+
 /** Collapse bursts of changes (dragging a fader) into one write. */
 export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: number) {
   let timer: ReturnType<typeof setTimeout> | undefined;

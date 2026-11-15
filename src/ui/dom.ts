@@ -37,13 +37,17 @@ export function svgIcon(path: string): SVGSVGElement {
   svg.setAttribute("focusable", "false");
   const p = document.createElementNS(ns, "path");
   p.setAttribute("d", path);
+  p.setAttribute("fill-rule", "evenodd");
   svg.append(p);
   return svg;
 }
 
 export const ICONS = {
   play: "M7 4.5v15l13-7.5z",
+  pause: "M6 5h4.5v14H6zM13.5 5H18v14h-4.5z",
   stop: "M6 6h12v12H6z",
+  record: "M12 5a7 7 0 1 0 0 14a7 7 0 1 0 0-14z",
+  metronome: "M8 3h8l4 18H4zM9.6 5l-3.1 14h11l-3.1-14zM11 16.6l4.6-9.2 1.3.7-4.6 9.2z",
 };
 
 let uid = 0;

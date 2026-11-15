@@ -1,116 +1,152 @@
-import { MAX_BPM, MIN_BPM, clampBpm } from "../core/timing";
-import { LOOP_BAR_OPTIONS, type LoopBars } from "../core/types";
-import { segmented } from "./controls";
+import { MAX_BEATS, MAX_BPM, MIN_BPM, maxBarsFor } from "../core/timing";
+import type { TimeSignature } from "../core/types";
+import { numberField } from "./controls";
 import { ICONS, h, setAttr, svgIcon } from "./dom";
 import type { AppState } from "./store";
 
 export interface TransportActions {
-  play(): void;
+  togglePlay(): void;
   stop(): void;
+  toggleRecord(): void;
+  toggleMetronome(): void;
   setBpm(bpm: number): void;
-  setBars(bars: LoopBars): void;
+  setBars(bars: number): void;
+  setTimeSig(sig: TimeSignature): void;
+  setSwing(swing: number): void;
 }
 
 export function createTransport(actions: TransportActions) {
+  const playIcon = svgIcon(ICONS.play);
+  const playText = h("span", {}, "Play");
   const play = h(
     "button",
-    {
-      type: "button",
-      class: "btn btn-play",
-      "aria-pressed": "false",
-      "aria-keyshortcuts": "P",
-      title: "Play (P)",
-      onclick: () => actions.play(),
-    },
-    svgIcon(ICONS.play),
-    h("span", {}, "Play"),
+    { type: "button", class: "btn btn-play", "aria-keyshortcuts": "P", title: "Play or pause (P)", onclick: () => actions.togglePlay() },
+    playIcon,
+    playText,
   );
   const stop = h(
     "button",
-    {
-      type: "button",
-      class: "btn",
-      "aria-keyshortcuts": "P",
-      title: "Stop (P)",
-      onclick: () => actions.stop(),
-    },
+    { type: "button", class: "btn", "aria-keyshortcuts": "Escape", title: "Stop and go back to the start (Esc)", onclick: () => actions.stop() },
     svgIcon(ICONS.stop),
     h("span", {}, "Stop"),
+  );
+  const record = h(
+    "button",
+    {
+      type: "button",
+      class: "btn btn-rec",
+      "aria-pressed": "false",
+      "aria-keyshortcuts": "Shift+R",
+      title: "Record notes into the melody track (Shift+R)",
+      onclick: () => actions.toggleRecord(),
+    },
+    svgIcon(ICONS.record),
+    h("span", {}, "Rec"),
+  );
+  const metro = h(
+    "button",
+    {
+      type: "button",
+      class: "btn btn-icon",
+      "aria-pressed": "false",
+      "aria-label": "Metronome",
+      title: "Metronome",
+      onclick: () => actions.toggleMetronome(),
+    },
+    svgIcon(ICONS.metronome),
   );
 
   const range = h("input", {
     type: "range",
-    id: "bpm-range",
     min: MIN_BPM,
     max: MAX_BPM,
     step: 1,
     "aria-label": "Tempo",
     oninput: () => actions.setBpm(Number(range.value)),
   });
-  const num = h("input", {
-    type: "number",
-    id: "bpm-num",
-    class: "bpm-num",
-    min: MIN_BPM,
-    max: MAX_BPM,
-    step: 1,
-    inputmode: "numeric",
-    "aria-label": "Tempo in beats per minute",
-    onchange: () => {
-      const bpm = clampBpm(num.value);
-      num.value = String(bpm);
-      actions.setBpm(bpm);
-    },
-  });
-  const tempo = h(
-    "div",
-    { class: "tempo" },
-    h("label", { for: "bpm-range", class: "field-label" }, "Tempo"),
-    range,
-    num,
-    h("span", { class: "unit", "aria-hidden": "true" }, "BPM"),
-  );
+  const bpm = numberField({ label: "Tempo in beats per minute", min: MIN_BPM, max: MAX_BPM, className: "num-3", onCommit: actions.setBpm });
+  const tempo = h("div", { class: "field" }, h("span", { class: "field-label", "aria-hidden": "true" }, "Tempo"), range, bpm.el, h("span", { class: "unit", "aria-hidden": "true" }, "BPM"));
 
-  const bars = segmented<LoopBars>({
-    legend: "Loop",
-    options: LOOP_BAR_OPTIONS.map((b) => ({
-      value: b,
-      label: String(b),
-      title: `${b} bar${b > 1 ? "s" : ""}`,
-    })),
-    value: 1,
-    onChange: (b) => actions.setBars(b),
-    className: "seg-bars",
+  let sig: TimeSignature = { beats: 4, unit: 4 };
+  const beats = numberField({
+    label: "Beats per bar",
+    min: 1,
+    max: MAX_BEATS,
+    className: "num-2",
+    onCommit: (b) => actions.setTimeSig({ ...sig, beats: Math.round(b) }),
   });
-  bars.el.append(h("span", { class: "unit", "aria-hidden": "true" }, "bars"));
+  const unit = h(
+    "select",
+    { class: "select", "aria-label": "Beat note value", onchange: () => actions.setTimeSig({ ...sig, unit: unit.value === "8" ? 8 : 4 }) },
+    h("option", { value: "4" }, "4"),
+    h("option", { value: "8" }, "8"),
+  );
+  const meter = h("div", { class: "field", role: "group", "aria-label": "Time signature" }, h("span", { class: "field-label", "aria-hidden": "true" }, "Time"), beats.el, h("span", { class: "slash", "aria-hidden": "true" }, "/"), unit);
+
+  const bars = numberField({ label: "Bars in the loop", min: 1, max: 16, className: "num-2", onCommit: (b) => actions.setBars(Math.round(b)) });
+  const barsField = h("div", { class: "field" }, h("span", { class: "field-label", "aria-hidden": "true" }, "Bars"), bars.el);
+
+  const swing = h("input", {
+    type: "range",
+    class: "swing",
+    min: 0,
+    max: 100,
+    step: 1,
+    "aria-label": "Swing",
+    oninput: () => actions.setSwing(Number(swing.value) / 100),
+  });
+  const swingOut = h("span", { class: "unit swing-out", "aria-hidden": "true" });
+  const swingField = h("div", { class: "field" }, h("span", { class: "field-label", "aria-hidden": "true" }, "Swing"), swing, swingOut);
 
   const status = h("p", { class: "sr-only", role: "status", "aria-live": "polite" });
 
   const el = h(
     "div",
     { class: "transport", role: "group", "aria-label": "Transport" },
-    h("div", { class: "transport-buttons" }, play, stop),
+    h("div", { class: "transport-buttons" }, play, stop, record, metro),
     tempo,
-    bars.el,
+    meter,
+    barsField,
+    swingField,
     status,
   );
 
-  let wasPlaying: boolean | null = null;
+  const STATUS: Record<AppState["playState"], string> = {
+    stopped: "Stopped",
+    paused: "Paused",
+    playing: "Playing",
+    counting: "Counting in",
+  };
+  let lastState: string | null = null;
+
   return {
     el,
     focusPlay: () => play.focus(),
     update(s: AppState) {
-      setAttr(play, "aria-pressed", String(s.playing));
-      play.classList.toggle("is-on", s.playing);
-      if (wasPlaying !== null && wasPlaying !== s.playing) {
-        status.textContent = s.playing ? "Playing" : "Stopped";
-      }
-      wasPlaying = s.playing;
-      const bpm = String(s.project.bpm);
-      if (range.value !== bpm) range.value = bpm;
-      setAttr(range, "aria-valuetext", `${bpm} BPM`);
-      if (document.activeElement !== num && num.value !== bpm) num.value = bpm;
-      bars.setValue(s.project.bars);
+      const { project } = s;
+      const running = s.playState === "playing" || s.playState === "counting";
+      play.classList.toggle("is-on", running);
+      (playIcon.firstChild as SVGPathElement).setAttribute("d", running ? ICONS.pause : ICONS.play);
+      playText.textContent = running ? "Pause" : "Play";
+      record.classList.toggle("is-on", s.recordArmed);
+      record.classList.toggle("is-live", s.recordArmed && running);
+      setAttr(record, "aria-pressed", String(s.recordArmed));
+      setAttr(metro, "aria-pressed", String(s.prefs.metronome));
+      if (lastState !== null && lastState !== s.playState) status.textContent = STATUS[s.playState];
+      lastState = s.playState;
+
+      if (range.value !== String(project.bpm)) range.value = String(project.bpm);
+      setAttr(range, "aria-valuetext", `${project.bpm} BPM`);
+      bpm.set(project.bpm);
+      sig = project.timeSig;
+      beats.set(sig.beats);
+      unit.value = String(sig.unit);
+      bars.set(project.bars);
+      setAttr(bars.input, "title", `1 to ${maxBarsFor(sig)} bars`);
+      const sw = Math.round(project.swing * 100);
+      if (swing.value !== String(sw)) swing.value = String(sw);
+      setAttr(swing, "aria-valuetext", `${sw}%`);
+      swingOut.textContent = `${sw}%`;
     },
   };
 }

@@ -1,14 +1,10 @@
-import { volumePercent } from "../core/mix";
+import { parsePercent, volumePercent } from "../core/mix";
 import type { TrackMix } from "../core/types";
 import { h, nextId, setAttr } from "./dom";
 
 export interface Segmented<T extends string | number> {
   el: HTMLFieldSetElement;
   setValue(value: T): void;
-  /** Hide options that do not apply right now (bars past the loop end). */
-  setAvailable(values: readonly T[]): void;
-  /** Put a small dot on one option, for example the bar that is playing. */
-  setMarked(value: T | null): void;
 }
 
 /**
@@ -24,11 +20,11 @@ export function segmented<T extends string | number>(opts: {
   className?: string;
 }): Segmented<T> {
   const name = nextId("seg");
-  const inputs = new Map<T, { input: HTMLInputElement; label: HTMLLabelElement }>();
+  const inputs = new Map<T, HTMLInputElement>();
   const el = h(
     "fieldset",
     { class: `seg ${opts.className ?? ""}` },
-    h("legend", { class: opts.hideLegend ? "sr-only" : "seg-legend" }, opts.legend),
+    h("legend", { class: opts.hideLegend ? "sr-only" : "field-label" }, opts.legend),
   );
   const row = h("div", { class: "seg-row" });
   for (const o of opts.options) {
@@ -40,25 +36,103 @@ export function segmented<T extends string | number>(opts: {
       onchange: () => opts.onChange(o.value),
     });
     input.checked = o.value === opts.value;
-    const label = h("label", { class: "seg-opt", title: o.title }, input, h("span", {}, o.label));
-    inputs.set(o.value, { input, label });
-    row.append(label);
+    inputs.set(o.value, input);
+    row.append(h("label", { class: "seg-opt", title: o.title }, input, h("span", {}, o.label)));
   }
   el.append(row);
   return {
     el,
     setValue(value) {
-      inputs.forEach(({ input }, v) => {
+      inputs.forEach((input, v) => {
         input.checked = v === value;
       });
     },
-    setAvailable(values) {
-      inputs.forEach(({ label }, v) => {
-        label.hidden = !values.includes(v);
-      });
+  };
+}
+
+/** A labeled checkbox styled as a small switch. */
+export function toggle(opts: { label: string; onChange: (on: boolean) => void; title?: string }) {
+  const input = h("input", {
+    type: "checkbox",
+    class: "toggle-input",
+    onchange: () => opts.onChange(input.checked),
+  });
+  const el = h("label", { class: "toggle", title: opts.title }, input, h("span", { class: "toggle-ui" }), opts.label);
+  return {
+    el,
+    set(on: boolean) {
+      input.checked = on;
     },
-    setMarked(value) {
-      inputs.forEach(({ label }, v) => label.classList.toggle("marked", v === value));
+  };
+}
+
+/**
+ * A number box that commits on Enter or when focus leaves, and puts the old
+ * value back if the text is not usable.
+ */
+export function numberField(opts: {
+  label: string;
+  min: number;
+  max: number;
+  step?: number;
+  className?: string;
+  suffix?: string;
+  parse?: (text: string) => number | null;
+  onCommit: (value: number) => void;
+}) {
+  const id = nextId("num");
+  let current = 0;
+  const input = h("input", {
+    id,
+    type: "text",
+    inputmode: "decimal",
+    class: `num ${opts.className ?? ""}`,
+    "aria-label": opts.label,
+    autocomplete: "off",
+    spellcheck: "false",
+  });
+  const parse =
+    opts.parse ??
+    ((t: string) => {
+      const n = Number.parseFloat(t);
+      return Number.isFinite(n) ? n : null;
+    });
+  const commit = () => {
+    const v = parse(input.value);
+    if (v === null) {
+      input.value = String(current);
+      return;
+    }
+    const clamped = Math.min(opts.max, Math.max(opts.min, v));
+    if (clamped !== current) opts.onCommit(clamped);
+    else input.value = String(current);
+  };
+  input.addEventListener("change", commit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      commit();
+      input.select();
+    } else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const step = (opts.step ?? 1) * (e.shiftKey ? 10 : 1);
+      const v = Math.min(opts.max, Math.max(opts.min, current + (e.key === "ArrowUp" ? step : -step)));
+      if (v !== current) opts.onCommit(v);
+    }
+  });
+  input.addEventListener("focus", () => input.select());
+  const el = h(
+    "span",
+    { class: "num-wrap" },
+    input,
+    opts.suffix ? h("span", { class: "num-suffix", "aria-hidden": "true" }, opts.suffix) : null,
+  );
+  return {
+    el,
+    input,
+    set(value: number) {
+      current = value;
+      if (document.activeElement !== input && input.value !== String(value)) input.value = String(value);
+      else if (document.activeElement === input && parse(input.value) !== value) input.value = String(value);
     },
   };
 }
@@ -68,26 +142,18 @@ export interface TrackHead {
   update(mix: TrackMix): void;
 }
 
-/** Name, mute button and volume fader for one track. */
+/** Name, mute, solo, a volume fader and a typed volume percent for one track. */
 export function trackHead(opts: {
   name: string;
-  extra?: HTMLElement;
   onMute: (muted: boolean) => void;
+  onSolo: (solo: boolean) => void;
   onVolume: (volume: number) => void;
 }): TrackHead {
-  let muted = false;
-  const mute = h(
-    "button",
-    {
-      type: "button",
-      class: "mute",
-      "aria-pressed": "false",
-      "aria-label": `Mute ${opts.name}`,
-      title: `Mute ${opts.name}`,
-      onclick: () => opts.onMute(!muted),
-    },
-    "M",
-  );
+  let mix: TrackMix = { volume: 0, muted: false, solo: false };
+  const small = (text: string, label: string, cls: string, onclick: () => void) =>
+    h("button", { type: "button", class: `mini ${cls}`, "aria-pressed": "false", "aria-label": label, title: label, onclick }, text);
+  const mute = small("M", `Mute ${opts.name}`, "mute", () => opts.onMute(!mix.muted));
+  const solo = small("S", `Solo ${opts.name}`, "solo", () => opts.onSolo(!mix.solo));
   const fader = h("input", {
     type: "range",
     class: "fader",
@@ -97,22 +163,36 @@ export function trackHead(opts: {
     "aria-label": `${opts.name} volume`,
     oninput: () => opts.onVolume(Number(fader.value) / 100),
   });
+  const percent = numberField({
+    label: `${opts.name} volume, percent`,
+    min: 0,
+    max: 100,
+    className: "num-vol",
+    suffix: "%",
+    parse: (t) => {
+      const v = parsePercent(t);
+      return v === null ? null : Math.round(v * 100);
+    },
+    onCommit: (v) => opts.onVolume(v / 100),
+  });
   const el = h(
     "div",
     { class: "track-head" },
     h("span", { class: "track-name" }, opts.name),
-    opts.extra,
-    h("div", { class: "track-mix" }, mute, fader),
+    h("div", { class: "track-mix" }, mute, solo, fader, percent.el),
   );
   return {
     el,
-    update(mix) {
-      muted = mix.muted;
-      setAttr(mute, "aria-pressed", String(mix.muted));
-      el.classList.toggle("is-muted", mix.muted);
-      const v = String(Math.round(mix.volume * 100));
+    update(next) {
+      mix = next;
+      setAttr(mute, "aria-pressed", String(next.muted));
+      setAttr(solo, "aria-pressed", String(next.solo));
+      el.classList.toggle("is-muted", next.muted);
+      el.classList.toggle("is-solo", next.solo);
+      const v = String(Math.round(next.volume * 100));
       if (fader.value !== v) fader.value = v;
-      setAttr(fader, "aria-valuetext", volumePercent(mix.volume));
+      setAttr(fader, "aria-valuetext", volumePercent(next.volume));
+      percent.set(Math.round(next.volume * 100));
     },
   };
 }
