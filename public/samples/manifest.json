@@ -1,0 +1,317 @@
+[
+ {
+  "id": "grand-piano",
+  "name": "Grand piano",
+  "group": "Keys",
+  "kind": "melodic",
+  "url": "samples/keys/grand-piano.wav",
+  "root": 72,
+  "source": "VCSL"
+ },
+ {
+  "id": "fm-piano",
+  "name": "FM electric piano",
+  "group": "Keys",
+  "kind": "melodic",
+  "url": "samples/keys/fm-piano.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "clavisynth",
+  "name": "Clavisynth",
+  "group": "Keys",
+  "kind": "melodic",
+  "url": "samples/keys/clavisynth.wav",
+  "root": 84,
+  "source": "VCSL"
+ },
+ {
+  "id": "organ",
+  "name": "Pipe organ",
+  "group": "Keys",
+  "kind": "melodic",
+  "url": "samples/keys/organ.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "marimba",
+  "name": "Marimba",
+  "group": "Mallets",
+  "kind": "melodic",
+  "url": "samples/mallets/marimba.wav",
+  "root": 72,
+  "source": "VCSL"
+ },
+ {
+  "id": "glockenspiel",
+  "name": "Glockenspiel",
+  "group": "Mallets",
+  "kind": "melodic",
+  "url": "samples/mallets/glockenspiel.wav",
+  "root": 84,
+  "source": "VCSL"
+ },
+ {
+  "id": "xylophone",
+  "name": "Xylophone",
+  "group": "Mallets",
+  "kind": "melodic",
+  "url": "samples/mallets/xylophone.wav",
+  "root": 84,
+  "source": "VCSL"
+ },
+ {
+  "id": "kalimba",
+  "name": "Kalimba",
+  "group": "Mallets",
+  "kind": "melodic",
+  "url": "samples/mallets/kalimba.wav",
+  "root": 69,
+  "source": "VCSL"
+ },
+ {
+  "id": "chimes",
+  "name": "Tubular bells",
+  "group": "Mallets",
+  "kind": "melodic",
+  "url": "samples/mallets/chimes.wav",
+  "root": 72,
+  "source": "VCSL"
+ },
+ {
+  "id": "vibraphone",
+  "name": "Vibraphone",
+  "group": "Mallets",
+  "kind": "melodic",
+  "url": "samples/mallets/vibraphone.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "harp",
+  "name": "Harp",
+  "group": "Strings",
+  "kind": "melodic",
+  "url": "samples/strings/harp.wav",
+  "root": 72,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "violin-pizz",
+  "name": "Violins, pizzicato",
+  "group": "Strings",
+  "kind": "melodic",
+  "url": "samples/strings/violin-pizz.wav",
+  "root": 72,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "violins",
+  "name": "Violins, sustained",
+  "group": "Strings",
+  "kind": "melodic",
+  "url": "samples/strings/violins.wav",
+  "root": 72,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "cello-pizz",
+  "name": "Cellos, pizzicato",
+  "group": "Strings",
+  "kind": "melodic",
+  "url": "samples/strings/cello-pizz.wav",
+  "root": 60,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "flute",
+  "name": "Flute",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/flute.wav",
+  "root": 84,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "horn",
+  "name": "French horn",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/horn.wav",
+  "root": 60,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "trumpet",
+  "name": "Trumpet",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/trumpet.wav",
+  "root": 60,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "tenor-sax",
+  "name": "Tenor sax",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/tenor-sax.wav",
+  "root": 72,
+  "source": "VCSL"
+ },
+ {
+  "id": "ac-kick",
+  "name": "Kick, acoustic",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/ac-kick.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "ac-snare",
+  "name": "Snare, acoustic",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/ac-snare.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "ac-hat",
+  "name": "Hi-hat, closed",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/ac-hat.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "ac-ohat",
+  "name": "Hi-hat, open",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/ac-ohat.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "ac-clap",
+  "name": "Hand clap",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/ac-clap.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "cymbal",
+  "name": "Cymbal",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/cymbal.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "ac-tom",
+  "name": "Tom",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/ac-tom.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "cowbell",
+  "name": "Cowbell, real",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/cowbell.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "tambourine",
+  "name": "Tambourine",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/tambourine.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "shaker",
+  "name": "Shaker",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/shaker.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "woodblock",
+  "name": "Woodblock",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/woodblock.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "conga",
+  "name": "Conga",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/conga.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "bongo",
+  "name": "Bongo",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/bongo.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "cajon",
+  "name": "Cajon",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/cajon.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "agogo",
+  "name": "Agogo",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/agogo.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "claves",
+  "name": "Claves",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/claves.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "triangle",
+  "name": "Triangle",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/triangle.wav",
+  "root": 60,
+  "source": "VCSL"
+ }
+]
