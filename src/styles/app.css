@@ -2266,3 +2266,151 @@ kbd {
   padding: 0 11px;
   font-size: 0.85rem;
 }
+
+/* ---------- Sound browser ---------- */
+
+[data-sound="sample"] {
+  --c: #d8cfbf;
+}
+
+.touch-only {
+  display: none;
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .touch-only {
+    display: inline;
+  }
+}
+
+.sounds-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(520px, calc(100vw - 32px));
+  padding: 0 16px 14px;
+}
+
+.sounds-lede {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.sounds-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.sound-search {
+  flex: 1 1 180px;
+  width: auto;
+  min-height: 38px;
+  font-weight: 400;
+}
+
+.sound-list {
+  flex: 1 1 auto;
+  min-height: 120px;
+  max-height: min(52vh, 520px);
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+}
+
+.sound-section {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 12px;
+  background: #101016;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.sound {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.sound.is-selected {
+  background: rgba(157, 184, 255, 0.1);
+  box-shadow: inset 3px 0 0 var(--c);
+}
+
+.sound-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sound-main:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sound-name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sound-status {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--focus);
+  white-space: nowrap;
+}
+
+.sound-add {
+  flex: none;
+}
+
+.sounds-empty {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.sounds-own {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+@media (max-width: 720px) {
+  .sounds-body {
+    width: 100%;
+  }
+  /* On a phone the window fills the screen, so the list takes all the room left. */
+  .sound-list {
+    max-height: none;
+  }
+  .sound-status {
+    font-size: 0.7rem;
+  }
+}

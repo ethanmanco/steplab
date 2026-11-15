@@ -71,6 +71,8 @@ export interface AppState {
   /** The channel open in the channel settings window. */
   openChannel: string | null;
   mixerOpen: boolean;
+  /** The sound browser, for adding channels. */
+  soundsOpen: boolean;
   /** Loading or error text per sample id. */
   sampleStatus: Record<string, string>;
   /** Patterns that play along while recording with backing. Null means automatic: what plays alongside in the song. */

@@ -3,7 +3,8 @@ import { volumeToDb } from "../core/mix";
 import { midiToFreq } from "../core/notes";
 import { audibleChannels, type StepEvents } from "../core/schedule";
 import { secondsPerStep, swingDelay } from "../core/timing";
-import type { Channel, DelayTime, Project, SampleInfo, ToneShape } from "../core/types";
+import { DEFAULT_TONE } from "../core/project";
+import type { Channel, DelayTime, DrumId, Project, SynthId, ToneShape } from "../core/types";
 import { createDrumVoice, type DrumVoice } from "./drums";
 import { createInstrument, cutoffHz, envelopeScale, type Instrument } from "./instruments";
 
@@ -32,8 +33,20 @@ export interface Graph {
   sync(project: Project): void;
   setBacking(keepChannelId: string | null, level: number): void;
   silence(time?: number): void;
+  /** Pick the sound to try out (or none). `key` names it, so the same sound is not rebuilt. */
+  audition(sound: AuditionSound | null, key: string): void;
+  auditionOn(pitch: number, velocity: number, time: number): void;
+  auditionOff(pitch: number, time: number): void;
   dispose(): void;
 }
+
+/**
+ * A sound being tried in the sound browser, before it is a channel: a
+ * built-in drum or synth, or a decoded sample (pitched around `root`).
+ */
+export type AuditionSound =
+  | { kind: "drum"; sound: DrumId; buffer?: AudioBuffer }
+  | { kind: "synth"; sound: SynthId; buffer?: AudioBuffer; root?: number };
 
 /** Looks up decoded audio for a sample, if it has loaded. */
 export type SampleSource = (id: string) => AudioBuffer | undefined;
@@ -66,8 +79,8 @@ interface Slot {
 }
 
 /** A sample as a melodic instrument: pitched around its root note. */
-function sampleInstrument(buffer: AudioBuffer, info: SampleInfo): Instrument {
-  const sampler = new Tone.Sampler({ urls: { [info.root]: new Tone.ToneAudioBuffer(buffer) }, attack: 0.002, release: 0.4 });
+function sampleInstrument(buffer: AudioBuffer, root: number): Instrument {
+  const sampler = new Tone.Sampler({ urls: { [root]: new Tone.ToneAudioBuffer(buffer) }, attack: 0.002, release: 0.4 });
   return {
     output: sampler,
     play: (midi, seconds, time, velocity) => sampler.triggerAttackRelease(midiToFreq(midi), seconds, time, velocity),
@@ -110,6 +123,9 @@ export function createGraph(project: Project, samples: SampleSource = () => unde
   const delay = new Tone.FeedbackDelay({ delayTime: 0.375, feedback: 0.35, wet: 1 }).connect(master);
   const slots = new Map<string, Slot>();
   let backing: { keep: string; level: number } | null = null;
+  // The sound browser's voice goes straight to the master at a new channel's level, dry.
+  const auditionOut = new Tone.Gain(Tone.dbToGain(volumeToDb(0.8))).connect(master);
+  let audition: { key: string; drum?: DrumVoice; synth?: Instrument } | null = null;
 
   function voiceKey(p: Project, ch: Channel): string {
     const info = ch.sample ? p.samples.find((s) => s.id === ch.sample) : undefined;
@@ -124,7 +140,7 @@ export function createGraph(project: Project, samples: SampleSource = () => unde
       slot.drum = buffer ? sampleDrum(buffer) : createDrumVoice(ch.sound);
       slot.drum.output.connect(slot.filter);
     } else {
-      slot.synth = buffer && info ? sampleInstrument(buffer, info) : createInstrument(ch.sound);
+      slot.synth = buffer && info ? sampleInstrument(buffer, info.root) : createInstrument(ch.sound);
       slot.synth.output.connect(slot.filter);
     }
   }
@@ -274,6 +290,38 @@ export function createGraph(project: Project, samples: SampleSource = () => unde
     },
     silence(time) {
       slots.forEach((s) => s.synth?.releaseAll(time));
+      audition?.synth?.releaseAll(time);
+    },
+    audition(sound, key) {
+      if (audition?.key === (sound ? key : "")) return;
+      if (audition) {
+        // Let the last sound ring out before freeing it.
+        const old = audition;
+        old.synth?.releaseAll();
+        window.setTimeout(() => {
+          old.drum?.dispose();
+          old.synth?.dispose();
+        }, 3000);
+      }
+      audition = null;
+      if (!sound) return;
+      if (sound.kind === "drum") {
+        const drum = sound.buffer ? sampleDrum(sound.buffer) : createDrumVoice(sound.sound);
+        drum.output.connect(auditionOut);
+        audition = { key, drum };
+      } else {
+        const synth = sound.buffer ? sampleInstrument(sound.buffer, sound.root ?? 60) : createInstrument(sound.sound);
+        synth.setTone(DEFAULT_TONE);
+        synth.output.connect(auditionOut);
+        audition = { key, synth };
+      }
+    },
+    auditionOn(pitch, velocity, time) {
+      audition?.drum?.trigger(time);
+      audition?.synth?.attack(pitch, time, velocity);
+    },
+    auditionOff(pitch, time) {
+      audition?.synth?.release(pitch, time);
     },
     dispose() {
       slots.forEach(disposeSlot);
@@ -281,7 +329,9 @@ export function createGraph(project: Project, samples: SampleSource = () => unde
       window.clearTimeout(reverbIdle);
       reverb?.dispose();
       reverb = null;
-      [reverbBus, delay, master, limiter].forEach((n) => n.dispose());
+      audition?.drum?.dispose();
+      audition?.synth?.dispose();
+      [auditionOut, reverbBus, delay, master, limiter].forEach((n) => n.dispose());
     },
   };
   graph.sync(project);

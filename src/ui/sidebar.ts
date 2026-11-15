@@ -7,9 +7,7 @@ import { h, setAttr } from "./dom";
 import { sectionOpen, type AppState, type SectionId } from "./store";
 
 export interface SidebarActions {
-  addChannel(kind: "drum" | "synth", sound: DrumId | SynthId): void;
-  addSampleChannel(kind: "drum" | "synth"): void;
-  addLibraryChannel(libraryId: string): void;
+  openSounds(): void;
   openSettings(id: string): void;
   removeChannel(id: string): void;
   renameChannel(id: string): void;
@@ -78,32 +76,8 @@ export function createSidebar(actions: SidebarActions) {
     return { el, name, sound, remove, settings, head };
   }
 
-  const addSelect = h(
-    "select",
-    { class: "select", "aria-label": "Sound for the new channel" },
-    h("optgroup", { label: "Drums" }, ...DRUM_IDS.map((d) => h("option", { value: `drum:${d}` }, DRUM_NAMES[d]))),
-    h("optgroup", { label: "Synths" }, ...SYNTH_IDS.map((s) => h("option", { value: `synth:${s}` }, SYNTHS[s].name))),
-    h(
-      "optgroup",
-      { label: "Your own audio" },
-      h("option", { value: "sample:drum" }, "Sample, one shot (drum)"),
-      h("option", { value: "sample:synth" }, "Sample, pitched (melody)"),
-    ),
-  );
-  const addBtn = h(
-    "button",
-    {
-      type: "button",
-      class: "btn btn-small",
-      onclick: () => {
-        const [kind, sound] = addSelect.value.split(":");
-        if (kind === "sample") actions.addSampleChannel(sound === "synth" ? "synth" : "drum");
-        else if (kind === "lib") actions.addLibraryChannel(addSelect.value.slice(4));
-        else actions.addChannel(kind as "drum" | "synth", sound as DrumId | SynthId);
-      },
-    },
-    "Add channel",
-  );
+  // Adding a channel happens in the sound browser, where you can hear sounds first.
+  const addBtn = h("button", { type: "button", class: "btn btn-small", onclick: () => actions.openSounds() }, "Add channel");
 
   const rackFold = disclosure({ title: "Channels", onToggle: (open) => actions.toggleSection("channels", open) });
   rackFold.body.append(
@@ -111,7 +85,6 @@ export function createSidebar(actions: SidebarActions) {
     h(
       "div",
       { class: "side-add" },
-      addSelect,
       addBtn,
       h("button", { type: "button", class: "btn btn-small", title: "Add any 808 kit sounds this song does not have yet", onclick: () => actions.addKit808() }, "Add 808 kit"),
     ),
@@ -194,18 +167,7 @@ export function createSidebar(actions: SidebarActions) {
     if (hadFocus) patList.querySelector<HTMLElement>(`[data-focus-key="${hadFocus}"]`)?.focus();
   }
 
-  const builtIn = [...addSelect.children];
   return {
-    /** List the bundled sample library in the Add channel menu, after the built-in sounds. */
-    setLibrary(list: { id: string; name: string; group: string }[]) {
-      const groups = [...new Set(list.map((x) => x.group))];
-      addSelect.replaceChildren(
-        ...builtIn,
-        ...groups.map((g) =>
-          h("optgroup", { label: `Recorded: ${g}` }, ...list.filter((x) => x.group === g).map((x) => h("option", { value: `lib:${x.id}` }, x.name))),
-        ),
-      );
-    },
     el: h("div", { class: "sidebar" }, patterns, rack),
     /** F6: put focus in the channel rack. */
     focusRack() {

@@ -2,7 +2,7 @@ import * as Tone from "tone";
 import { eventsAt, loopLength } from "../core/schedule";
 import { pulseSteps, secondsPerStep, stepFromTicks, stepsPerBar } from "../core/timing";
 import type { PlayMode, Project } from "../core/types";
-import { createGraph, type Graph, type SampleSource } from "./graph";
+import { createGraph, type AuditionSound, type Graph, type SampleSource } from "./graph";
 
 export type PlayState = "stopped" | "counting" | "playing" | "paused";
 
@@ -210,5 +210,46 @@ export class Engine {
 
   noteOff(channelId: string, pitch: number): void {
     this.graph?.noteOff(channelId, pitch, Tone.immediate());
+  }
+
+  /* ---------- Trying sounds before they are channels ---------- */
+
+  /** Load the sound the browser is trying (or none). Works while the song plays. */
+  audition(sound: AuditionSound | null, key: string): void {
+    this.graph?.audition(sound, key);
+  }
+
+  /**
+   * Play the tried sound so you hear what it does: one hit for a drum, and
+   * for a melodic sound a short rising phrase and a chord around `home`.
+   * Bass sounds get single notes, since low chords turn to mud.
+   */
+  auditionDemo(kind: "drum" | "synth", home: number): void {
+    const g = this.graph;
+    if (!g) return;
+    const t = Tone.now() + 0.02;
+    if (kind === "drum") {
+      g.auditionOn(60, 0.9, t);
+      return;
+    }
+    const note = (pitch: number, at: number, length: number) => {
+      g.auditionOn(pitch, 0.8, t + at);
+      g.auditionOff(pitch, t + at + length);
+    };
+    if (home <= 45) {
+      [0, 0, 12, 7].forEach((o, i) => note(home + o, i * 0.24, i === 3 ? 0.6 : 0.2));
+      return;
+    }
+    [0, 4, 7, 12].forEach((o, i) => note(home + o, i * 0.17, 0.16));
+    for (const o of [0, 4, 7]) note(home + o, 0.72, 0.9);
+  }
+
+  /** Live keys on the tried sound. */
+  auditionOn(pitch: number, velocity: number): void {
+    this.graph?.auditionOn(pitch, velocity, Tone.immediate());
+  }
+
+  auditionOff(pitch: number): void {
+    this.graph?.auditionOff(pitch, Tone.immediate());
   }
 }

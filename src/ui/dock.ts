@@ -21,6 +21,8 @@ export interface DockView {
   target: MelodyPattern | undefined;
   /** Name of the sound the keys play. */
   sound: string;
+  /** The keys are playing a sound from the sound browser, not a melody's channel. */
+  trying: boolean;
   recordArmed: boolean;
 }
 
@@ -217,8 +219,10 @@ export function createDock(actions: DockActions) {
         );
         melodySelect.value = v.target?.id ?? "";
       }
-      recNote.textContent = v.recordArmed ? (v.target ? "Recording" : "Pick a melody") : v.sound;
-      recNote.classList.toggle("is-rec", v.recordArmed);
+      // While trying a sound, the melody picker does not apply, so the sound name takes its place.
+      melodySelect.hidden = v.trying;
+      recNote.textContent = v.trying ? v.sound : v.recordArmed ? (v.target ? "Recording" : "Pick a melody") : v.sound;
+      recNote.classList.toggle("is-rec", v.recordArmed && !v.trying);
     },
   };
 }

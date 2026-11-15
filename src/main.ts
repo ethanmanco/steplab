@@ -82,6 +82,9 @@ import {
   type SectionId,
 } from "./ui/store";
 import { createDock } from "./ui/dock";
+import { createSoundBrowser } from "./ui/soundBrowser";
+import type { SoundItem } from "./core/soundCatalog";
+import type { AuditionSound } from "./audio/graph";
 import { createTransport } from "./ui/transport";
 
 const storage = getStorage();
@@ -131,6 +134,7 @@ const store = createStore({
   selectedClip: null,
   openChannel: null,
   mixerOpen: false,
+  soundsOpen: false,
   sampleStatus: {},
   drawLength: 2,
   prefs: cleanPrefs(loadPrefs(storage, DEFAULT_PREFS)),
@@ -262,7 +266,13 @@ function recordTarget(s: AppState = store.get()): MelodyPattern | undefined {
   return cur?.kind === "melody" ? cur : undefined;
 }
 
+/** Live keys play this instead of a channel while the sound browser is trying a sound. */
+const AUDITION = "audition";
+let auditioning: SoundItem | null = null;
+let auditionLoading: string | null = null;
+
 function liveChannel(): string | undefined {
+  if (store.get().soundsOpen && auditioning && !auditionLoading) return AUDITION;
   return recordTarget()?.channelId ?? synthChannels(project())[0]?.id;
 }
 
@@ -331,6 +341,93 @@ const mixActions = {
   setVolume: (id: string, volume: number) => edit((p) => setChannelMix(p, id, { volume }), `vol-${id}`),
 };
 
+function addSoundChannel(kind: "drum" | "synth", sound: DrumId | SynthId) {
+  edit((p) => {
+    const ch: Channel =
+      kind === "drum" ? drumChannel(sound as DrumId) : synthChannel(sound as SynthId);
+    return addChannel(p, { ...ch, name: uniqueChannelName(p, ch.name) });
+  });
+}
+function addSampleChannel(kind: "drum" | "synth") {
+  pickAudio(async (file) => {
+    const sampleId = makeId("s");
+    try {
+      await bank.importFile(file, sampleId);
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "That file could not be loaded.", "error");
+      return;
+    }
+    const name = file.name.replace(/\.[^.]+$/, "").slice(0, 40) || "Sample";
+    const ch: Channel = kind === "drum" ? drumChannel("kick808", name) : synthChannel("piano", name);
+    edit((p) => setChannelSample(addChannel(addSample(p, { id: sampleId, name, source: "user", root: 60 }), ch), ch.id, sampleId), null, undefined, { openChannel: ch.id });
+    toast.show(`Added ${name} as a ${kind === "drum" ? "one shot drum" : "pitched"} channel.`);
+  });
+}
+function addLibraryChannel(libraryId: string) {
+  const item = library.find((x) => x.id === libraryId);
+  if (!item) return;
+  const sampleId = `lib-${item.id}`;
+  const p0 = project();
+  const ch: Channel =
+    item.kind === "oneshot" ? drumChannel("kick808", uniqueChannelName(p0, item.name)) : synthChannel("piano", uniqueChannelName(p0, item.name));
+  edit((p) =>
+    setChannelSample(
+      addChannel(addSample(p, { id: sampleId, name: item.name, source: "bundled", url: item.url, root: item.root }), ch),
+      ch.id,
+      sampleId,
+    ),
+  );
+  toast.show(`Added ${item.name}${item.kind === "oneshot" ? " to the drum loops" : ". Use it in a melody"}.`);
+}
+
+/* ---------- Sound browser: hear sounds before adding them ---------- */
+
+async function auditionItem(item: SoundItem) {
+  releaseAllKeys();
+  auditioning = item;
+  let sound: AuditionSound =
+    item.kind === "drum" ? { kind: "drum", sound: item.sound as DrumId } : { kind: "synth", sound: item.sound as SynthId };
+  const lib = item.library;
+  if (lib) {
+    // Recorded sounds download the first time you try them.
+    auditionLoading = item.id;
+    render();
+    const buffer = await bank.load({ id: `lib-${lib.id}`, name: lib.name, source: "bundled", url: lib.url, root: lib.root });
+    if (auditioning !== item) return;
+    auditionLoading = null;
+    if (!buffer) {
+      toast.show(`${lib.name} could not be loaded. Check your connection and try again.`, "error");
+      auditioning = null;
+      render();
+      return;
+    }
+    sound = item.kind === "drum" ? { kind: "drum", sound: "kick808", buffer } : { kind: "synth", sound: "piano", buffer, root: lib.root };
+  }
+  engine.audition(sound, item.id);
+  engine.auditionDemo(item.kind, item.home);
+  render();
+}
+
+function stopAudition() {
+  releaseAllKeys();
+  auditioning = null;
+  auditionLoading = null;
+  engine.audition(null, "");
+}
+
+function addFromBrowser(item: SoundItem) {
+  if (item.library) {
+    addLibraryChannel(item.library.id);
+    return;
+  }
+  addSoundChannel(item.kind, item.sound);
+  toast.show(
+    item.kind === "drum"
+      ? `Added ${item.name}. It has a row in every drum loop.`
+      : `Added ${item.name}. Make a new melody with it, or pick it as a melody's channel.`,
+  );
+}
+
 function newMelody() {
   const { project: withPattern, id } = addMelodyPattern(project(), recordTarget()?.channelId);
   if (id) addAndPlace(withPattern, id, { openRoll: id });
@@ -338,13 +435,6 @@ function newMelody() {
 
 const sidebar = createSidebar({
   ...mixActions,
-  addChannel(kind, sound) {
-    edit((p) => {
-      const ch: Channel =
-        kind === "drum" ? drumChannel(sound as DrumId) : synthChannel(sound as SynthId);
-      return addChannel(p, { ...ch, name: uniqueChannelName(p, ch.name) });
-    });
-  },
   removeChannel: (id) => edit((p) => removeChannel(p, id)),
   renameChannel(id) {
     const ch = findChannel(project(), id);
@@ -353,38 +443,8 @@ const sidebar = createSidebar({
     if (name !== null) edit((p) => renameChannel(p, id, name));
   },
   setChannelSound: (id, sound) => edit((p) => setChannelSound(p, id, sound)),
-  addSampleChannel(kind) {
-    pickAudio(async (file) => {
-      const sampleId = makeId("s");
-      try {
-        await bank.importFile(file, sampleId);
-      } catch (err) {
-        toast.show(err instanceof Error ? err.message : "That file could not be loaded.", "error");
-        return;
-      }
-      const name = file.name.replace(/\.[^.]+$/, "").slice(0, 40) || "Sample";
-      const ch: Channel = kind === "drum" ? drumChannel("kick808", name) : synthChannel("piano", name);
-      edit((p) => setChannelSample(addChannel(addSample(p, { id: sampleId, name, source: "user", root: 60 }), ch), ch.id, sampleId), null, undefined, { openChannel: ch.id });
-      toast.show(`Added ${name} as a ${kind === "drum" ? "one shot drum" : "pitched"} channel.`);
-    });
-  },
   openSettings: (id) => store.set({ openChannel: id }),
-  addLibraryChannel(libraryId) {
-    const item = library.find((x) => x.id === libraryId);
-    if (!item) return;
-    const sampleId = `lib-${item.id}`;
-    const p0 = project();
-    const ch: Channel =
-      item.kind === "oneshot" ? drumChannel("kick808", uniqueChannelName(p0, item.name)) : synthChannel("piano", uniqueChannelName(p0, item.name));
-    edit((p) =>
-      setChannelSample(
-        addChannel(addSample(p, { id: sampleId, name: item.name, source: "bundled", url: item.url, root: item.root }), ch),
-        ch.id,
-        sampleId,
-      ),
-    );
-    toast.show(`Added ${item.name}${item.kind === "oneshot" ? " to the drum loops" : ". Use it in a melody"}.`);
-  },
+  openSounds: () => store.set({ soundsOpen: true }),
   addKit808() {
     const have = new Set(project().channels.filter((c) => c.kind === "drum").map((c) => c.sound));
     const missing = DRUMS_808.filter((d) => !have.has(d));
@@ -555,8 +615,10 @@ function noteDown(key: string, pitch: number, velocity: number) {
   if (held.has(key)) return;
   const channelId = liveChannel();
   if (!channelId) return;
-  engine.noteOn(channelId, pitch, velocity);
-  const target = recordTarget();
+  if (channelId === AUDITION) engine.auditionOn(pitch, velocity);
+  else engine.noteOn(channelId, pitch, velocity);
+  // Trying a sound is never recorded.
+  const target = channelId === AUDITION ? undefined : recordTarget();
   held.set(key, { channelId, patternId: target?.id ?? null, pitch, velocity, down: target ? recordPosition(target) : null });
   rollEditor.press(pitch, true);
 }
@@ -565,7 +627,8 @@ function noteUp(key: string) {
   const note = held.get(key);
   if (!note) return;
   held.delete(key);
-  engine.noteOff(note.channelId, note.pitch);
+  if (note.channelId === AUDITION) engine.auditionOff(note.pitch);
+  else engine.noteOff(note.channelId, note.pitch);
   rollEditor.press(note.pitch, false);
   const up = engine.heardSteps();
   if (note.down === null || up === null || !note.patternId || !inRollRange(note.pitch)) return;
@@ -637,7 +700,7 @@ void fetch(`${import.meta.env.BASE_URL}samples/manifest.json`)
       (x): x is LibrarySample =>
         typeof x?.id === "string" && typeof x?.name === "string" && typeof x?.url === "string" && typeof x?.group === "string",
     );
-    sidebar.setLibrary(library);
+    soundBrowser.setLibrary(library);
     render();
   })
   .catch(() => undefined);
@@ -856,6 +919,12 @@ const examplesWin = createExamplesWindow(PRESETS, (preset) => {
   examplesWin.hide();
   toast.show(`Loaded ${preset.name}. Press Space to play. Ctrl+Z brings back your song.`);
 });
+const soundBrowser = createSoundBrowser({
+  close: () => store.set({ soundsOpen: false }),
+  audition: (item) => void auditionItem(item),
+  add: addFromBrowser,
+  addFile: addSampleChannel,
+});
 const examplesBtn = h(
   "button",
   { type: "button", class: "btn btn-small", title: "Load an example song", onclick: () => examplesWin.show() },
@@ -945,7 +1014,9 @@ const moreBtn = h(
   "More",
 );
 const topTools = h("span", { class: "top-tools" }, files.history, examplesBtn, mixerBtn, moreBtn);
-const moreTools = h("div", { class: "more-tools" }, layoutSeg.el, helpBtn);
+// Channels start folded on phones, so Add channel is in More there too.
+const moreAddBtn = h("button", { type: "button", class: "btn btn-small compact-only", onclick: () => store.set({ soundsOpen: true }) }, "Add channel");
+const moreTools = h("div", { class: "more-tools" }, moreAddBtn, layoutSeg.el, helpBtn);
 layoutSeg.el.classList.add("touch-hide");
 helpBtn.classList.add("touch-hide");
 transport.metro.append(h("span", { class: "metro-text" }, "Metronome"));
@@ -1013,7 +1084,7 @@ app.append(
   ),
   toast.el,
 );
-document.body.append(dock.el, drumEditor.win.el, rollEditor.win.el, helpWin.el, channelSettings.win.el, mixer.win.el, examplesWin.el, audioInput);
+document.body.append(dock.el, drumEditor.win.el, rollEditor.win.el, helpWin.el, channelSettings.win.el, mixer.win.el, examplesWin.el, soundBrowser.win.el, audioInput);
 paintStarfield();
 
 function render() {
@@ -1026,6 +1097,7 @@ function render() {
   channelSettings.update(s);
   mixer.update(s);
   mixerBtn.setAttribute("aria-pressed", String(s.mixerOpen));
+  soundBrowser.update(s, { selected: auditioning?.id ?? null, loading: auditionLoading });
   const target = recordTarget(s);
   const liveId = liveChannel();
   dock.update({
@@ -1033,7 +1105,8 @@ function render() {
     base: s.prefs.keysBase,
     melodies: s.project.patterns.filter((x): x is MelodyPattern => x.kind === "melody"),
     target,
-    sound: (liveId && findChannel(s.project, liveId)?.name) || "",
+    sound: liveId === AUDITION && auditioning ? `Trying ${auditioning.name}` : (liveId && findChannel(s.project, liveId)?.name) || "",
+    trying: liveId === AUDITION,
     recordArmed: s.recordArmed,
   });
   files.setHistory(s.canUndo, s.canRedo);
@@ -1041,14 +1114,14 @@ function render() {
   workspace.dataset.layout = s.prefs.layout;
   workspace.style.setProperty("--side-w", `${s.prefs.sidebarWidth}px`);
   splitter.setAttribute("aria-valuenow", String(s.prefs.sidebarWidth));
-  for (const w of [drumEditor.win, rollEditor.win, helpWin, channelSettings.win, mixer.win, examplesWin]) {
+  for (const w of [drumEditor.win, rollEditor.win, helpWin, channelSettings.win, mixer.win, examplesWin, soundBrowser.win]) {
     w.setLayout(s.prefs.layout);
     w.fit();
   }
   document.documentElement.style.setProperty("--step-w", `${s.prefs.zoom}px`);
 }
 window.addEventListener("resize", () => {
-  for (const w of [drumEditor.win, rollEditor.win, helpWin, channelSettings.win, mixer.win, examplesWin]) w.fit();
+  for (const w of [drumEditor.win, rollEditor.win, helpWin, channelSettings.win, mixer.win, examplesWin, soundBrowser.win]) w.fit();
 });
 
 // Autosave: quietly after each pause in editing, and right away when the tab is hidden.
@@ -1101,6 +1174,7 @@ store.subscribe((s, prev) => {
   }
   syncEngineSource(s);
   if (s.playState !== prev.playState && s.playState === "stopped") take = `take-${++takeCount}`;
+  if (prev.soundsOpen && !s.soundsOpen) stopAudition();
   render();
 });
 render();

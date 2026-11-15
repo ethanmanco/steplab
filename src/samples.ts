@@ -59,39 +59,51 @@ async function decode(bytes: ArrayBuffer): Promise<AudioBuffer> {
 
 export function createSampleBank(onLoaded: () => void) {
   const buffers = new Map<string, AudioBuffer>();
-  const pending = new Set<string>();
+  const pending = new Map<string, Promise<AudioBuffer | undefined>>();
   const failed = new Set<string>();
+
+  /** Fetch and decode one sample, once; later calls share the same promise. */
+  function load(s: SampleInfo): Promise<AudioBuffer | undefined> {
+    const have = buffers.get(s.id);
+    if (have) return Promise.resolve(have);
+    if (failed.has(s.id)) return Promise.resolve(undefined);
+    const running = pending.get(s.id);
+    if (running) return running;
+    const job = (async () => {
+      try {
+        let bytes: ArrayBuffer | undefined;
+        if (s.source === "bundled" && s.url) {
+          const res = await fetch(`${import.meta.env.BASE_URL}${s.url}`);
+          if (res.ok) bytes = await res.arrayBuffer();
+        } else {
+          bytes = await withStore<ArrayBuffer>("readonly", (st) => st.get(s.id));
+        }
+        if (!bytes) throw new Error("missing");
+        const buffer = await decode(bytes);
+        buffers.set(s.id, buffer);
+        onLoaded();
+        return buffer;
+      } catch {
+        failed.add(s.id);
+        onLoaded();
+        return undefined;
+      } finally {
+        pending.delete(s.id);
+      }
+    })();
+    pending.set(s.id, job);
+    return job;
+  }
 
   return {
     /** Decoded audio, if it has loaded. */
     get: (id: string) => buffers.get(id),
     failed: (id: string) => failed.has(id),
+    load,
 
     /** Make sure every sample in a project is loading. Calls onLoaded as each one is ready. */
     ensure(samples: SampleInfo[]) {
-      for (const s of samples) {
-        if (buffers.has(s.id) || pending.has(s.id) || failed.has(s.id)) continue;
-        pending.add(s.id);
-        void (async () => {
-          try {
-            let bytes: ArrayBuffer | undefined;
-            if (s.source === "bundled" && s.url) {
-              const res = await fetch(`${import.meta.env.BASE_URL}${s.url}`);
-              if (res.ok) bytes = await res.arrayBuffer();
-            } else {
-              bytes = await withStore<ArrayBuffer>("readonly", (st) => st.get(s.id));
-            }
-            if (!bytes) throw new Error("missing");
-            buffers.set(s.id, await decode(bytes));
-            onLoaded();
-          } catch {
-            failed.add(s.id);
-            onLoaded();
-          } finally {
-            pending.delete(s.id);
-          }
-        })();
-      }
+      for (const s of samples) void load(s);
     },
 
     /** Check, decode and store an audio file the user picked. */
