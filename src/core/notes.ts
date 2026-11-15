@@ -17,6 +17,18 @@ export const SYNTHS: Record<SynthId, SynthInfo> = {
   b808: { name: "808", home: 36 },
   pluck: { name: "Pluck", home: 67 },
   pad: { name: "Pad", home: 60 },
+  keys: { name: "Electric piano", home: 60 },
+  piano: { name: "Piano", home: 60 },
+  strings: { name: "Strings", home: 60 },
+  brass: { name: "Brass", home: 60 },
+  bell: { name: "Bell", home: 72 },
+  organ: { name: "Organ", home: 60 },
+  supersaw: { name: "Supersaw", home: 64 },
+  marimba: { name: "Marimba", home: 67 },
+  flute: { name: "Flute", home: 72 },
+  sub: { name: "Sub bass", home: 36 },
+  reese: { name: "Reese bass", home: 36 },
+  chip: { name: "Chiptune", home: 72 },
 };
 
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;

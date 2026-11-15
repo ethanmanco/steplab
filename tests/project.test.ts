@@ -5,7 +5,16 @@ import {
   addDrumPattern,
   addMelodyPattern,
   addNote,
+  addSample,
   addTrack,
+  DEFAULT_TONE,
+  removeSample,
+  resetChannelSound,
+  setChannelFx,
+  setChannelPan,
+  setChannelSample,
+  setChannelTone,
+  setMaster,
   clearPattern,
   deleteClip,
   deletePattern,
@@ -54,7 +63,7 @@ describe("emptyProject", () => {
     expect(synthChannels(p).map((c) => c.sound)).toEqual(["lead", "b808"]);
     expect(p.patterns.map((x) => x.kind)).toEqual(["drums", "melody"]);
     expect(p.clips.map((c) => [c.track, c.start, c.length])).toEqual([[0, 0, 16], [1, 0, 16]]);
-    expect(p).toMatchObject({ version: 3, timeSig: { beats: 4, unit: 4 }, swing: 0, tracks: 8 });
+    expect(p).toMatchObject({ version: 4, timeSig: { beats: 4, unit: 4 }, swing: 0, tracks: 8, samples: [] });
   });
 
   it("gives every channel, pattern and clip its own id", () => {
@@ -292,5 +301,58 @@ describe("playsAlongside", () => {
     const p0 = emptyProject();
     const { project, id } = addMelodyPattern(p0);
     expect(playsAlongside(project, id)).toEqual([p0.patterns[0]!.id]);
+  });
+});
+
+describe("sound shaping and mixer settings", () => {
+  it("starts every channel centered, with default tone and a clean insert", () => {
+    for (const c of emptyProject().channels) {
+      expect(c).toMatchObject({ pan: 0, tone: DEFAULT_TONE, fx: { low: 0, mid: 0, high: 0, comp: 0, reverb: 0, delay: 0 }, sample: null });
+    }
+  });
+
+  it("clamps pan, tone and effects into range", () => {
+    let p = emptyProject();
+    const id = p.channels[6]!.id;
+    p = setChannelPan(p, id, 3);
+    p = setChannelTone(p, id, { cutoff: 2, octave: 7.6, attack: -1 });
+    p = setChannelFx(p, id, { low: 40, reverb: 0.4, comp: 9 });
+    const c = p.channels[6]!;
+    expect(c.pan).toBe(1);
+    expect(c.tone).toMatchObject({ cutoff: 1, octave: 2, attack: 0, release: 0.5 });
+    expect(c.fx).toMatchObject({ low: 12, reverb: 0.4, comp: 1, mid: 0 });
+    expect(setChannelPan(p, id, Number.NaN).channels[6]!.pan).toBe(1);
+  });
+
+  it("resets a channel's sound settings", () => {
+    let p = emptyProject();
+    const id = p.channels[0]!.id;
+    p = setChannelFx(setChannelTone(setChannelPan(p, id, -0.5), id, { cutoff: 0.2 }), id, { delay: 1 });
+    expect(resetChannelSound(p, id).channels[0]).toMatchObject({ pan: 0, tone: DEFAULT_TONE, fx: { delay: 0 } });
+  });
+
+  it("keeps master settings in range", () => {
+    const p = setMaster(emptyProject(), { volume: 2, delayFeedback: 1, delayTime: "4n", reverbSize: -1 });
+    expect(p.master).toEqual({ volume: 1, delayFeedback: 0.9, delayTime: "4n", reverbSize: 0 });
+    expect(setMaster(p, { delayTime: "3n" as never }).master.delayTime).toBe("4n");
+  });
+});
+
+describe("samples", () => {
+  const info = { id: "s1", name: "  Vox chop  ", source: "user" as const, root: 64 };
+
+  it("adds, renames and removes samples, and only assigns known ones", () => {
+    let p = addSample(emptyProject(), info);
+    expect(p.samples).toEqual([{ ...info, name: "Vox chop" }]);
+    const id = p.channels[6]!.id;
+    expect(setChannelSample(p, id, "nope")).toBe(p);
+    p = setChannelSample(p, id, "s1");
+    expect(p.channels[6]!.sample).toBe("s1");
+    p = addSample(p, { ...info, name: "Vocal" });
+    expect(p.samples).toHaveLength(1);
+    expect(p.samples[0]!.name).toBe("Vocal");
+    p = removeSample(p, "s1");
+    expect(p.samples).toEqual([]);
+    expect(p.channels[6]!.sample).toBeNull();
   });
 });

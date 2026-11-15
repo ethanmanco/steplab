@@ -1,5 +1,8 @@
 import { inRollRange } from "./notes";
 import {
+  DEFAULT_FX,
+  DEFAULT_MASTER,
+  DEFAULT_TONE,
   DEFAULT_TRACKS,
   DEFAULT_VELOCITY,
   DEFAULT_VOLUME,
@@ -15,9 +18,15 @@ import {
 import { MAX_STEPS, clampBars, clampBpm, clampSwing, clampTimeSig, stepsPerBar } from "./timing";
 import {
   CLASSIC_DRUMS,
+  DELAY_TIMES,
   DRUM_IDS,
   SYNTH_IDS,
   type Channel,
+  type ChannelFx,
+  type DelayTime,
+  type Master,
+  type SampleInfo,
+  type ToneShape,
   type Clip,
   type DrumId,
   type Note,
@@ -29,12 +38,15 @@ import {
 
 /** Marks a JSON file as a Steplab project. */
 export const FILE_APP = "steplab";
-export const FILE_VERSION = 3;
+export const FILE_VERSION = 4;
 
-export type ParseResult = { ok: true; project: Project } | { ok: false; error: string };
+/** Audio for user samples, base64 encoded, keyed by sample id. Saved files carry it; autosave does not. */
+export type SampleData = Record<string, string>;
 
-export function serializeProject(project: Project, pretty = false): string {
-  const file = { app: FILE_APP, ...project, version: FILE_VERSION };
+export type ParseResult = { ok: true; project: Project; sampleData: SampleData } | { ok: false; error: string };
+
+export function serializeProject(project: Project, pretty = false, sampleData?: SampleData): string {
+  const file = { app: FILE_APP, ...project, version: FILE_VERSION, ...(sampleData && { sampleData }) };
   return JSON.stringify(file, null, pretty ? 2 : undefined);
 }
 
@@ -47,6 +59,59 @@ const isId = (v: unknown): v is string => typeof v === "string" && v.length > 0 
 const text = (v: unknown, fallback: string) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 40) : fallback);
 const isDrum = (v: unknown): v is DrumId => (DRUM_IDS as readonly unknown[]).includes(v);
 const isSynth = (v: unknown): v is SynthId => (SYNTH_IDS as readonly unknown[]).includes(v);
+
+const num = (v: unknown, lo: number, hi: number, fallback: number) => {
+  const n = Number(v);
+  return v !== null && v !== "" && Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : fallback;
+};
+
+function readTone(raw: unknown): ToneShape {
+  const r = isObject(raw) ? raw : {};
+  return {
+    cutoff: num(r.cutoff, 0, 1, DEFAULT_TONE.cutoff),
+    resonance: num(r.resonance, 0, 1, DEFAULT_TONE.resonance),
+    attack: num(r.attack, 0, 1, DEFAULT_TONE.attack),
+    release: num(r.release, 0, 1, DEFAULT_TONE.release),
+    octave: Math.round(num(r.octave, -2, 2, DEFAULT_TONE.octave)),
+    glide: num(r.glide, 0, 1, DEFAULT_TONE.glide),
+  };
+}
+
+function readFx(raw: unknown): ChannelFx {
+  const r = isObject(raw) ? raw : {};
+  return {
+    low: num(r.low, -12, 12, DEFAULT_FX.low),
+    mid: num(r.mid, -12, 12, DEFAULT_FX.mid),
+    high: num(r.high, -12, 12, DEFAULT_FX.high),
+    comp: num(r.comp, 0, 1, DEFAULT_FX.comp),
+    reverb: num(r.reverb, 0, 1, DEFAULT_FX.reverb),
+    delay: num(r.delay, 0, 1, DEFAULT_FX.delay),
+  };
+}
+
+function readMaster(raw: unknown): Master {
+  const r = isObject(raw) ? raw : {};
+  return {
+    volume: num(r.volume, 0, 1, DEFAULT_MASTER.volume),
+    reverbSize: num(r.reverbSize, 0, 1, DEFAULT_MASTER.reverbSize),
+    delayTime: (DELAY_TIMES as readonly unknown[]).includes(r.delayTime) ? (r.delayTime as DelayTime) : DEFAULT_MASTER.delayTime,
+    delayFeedback: num(r.delayFeedback, 0, 0.9, DEFAULT_MASTER.delayFeedback),
+  };
+}
+
+function readSample(raw: unknown): SampleInfo | null {
+  if (!isObject(raw) || !isId(raw.id)) return null;
+  const source = raw.source === "bundled" ? "bundled" : "user";
+  const url = typeof raw.url === "string" && /^samples\/[\w./-]+$/.test(raw.url) && !raw.url.includes("..") ? raw.url : undefined;
+  if (source === "bundled" && !url) return null;
+  return {
+    id: raw.id,
+    name: text(raw.name, "Sample").slice(0, 60),
+    source,
+    ...(url && { url }),
+    root: Math.round(num(raw.root, 0, 127, 60)),
+  };
+}
 
 function readMix(raw: Raw) {
   const v = Number(raw.volume);
@@ -97,7 +162,7 @@ interface OldSong {
 }
 
 /** Version 1 stored one on/off flag per step and piano rows relative to each sound. */
-const V1_SYNTHS: Record<SynthId, { base: number; gate: number }> = {
+const V1_SYNTHS: Partial<Record<SynthId, { base: number; gate: number }>> = {
   lead: { base: 60, gate: 1 },
   bass: { base: 36, gate: 1 },
   pluck: { base: 60, gate: 2 },
@@ -121,7 +186,7 @@ function readOld(data: Raw): OldSong {
     const synth = isSynth(raw.synth) ? raw.synth : fallback;
     let notes: Note[];
     if (v1) {
-      const { base, gate } = V1_SYNTHS[synth];
+      const { base, gate } = V1_SYNTHS[synth] ?? { base: 60, gate: 1 };
       notes = [];
       list(raw.notes).forEach((rows, step) => {
         for (const row of list(rows)) {
@@ -160,7 +225,7 @@ function upgrade(old: OldSong): Project {
   ];
   const length = old.bars * stepsPerBar(old.timeSig);
   return {
-    version: 3,
+    version: 4,
     bpm: old.bpm,
     timeSig: old.timeSig,
     swing: old.swing,
@@ -168,28 +233,40 @@ function upgrade(old: OldSong): Project {
     patterns,
     clips: patterns.map((pat, i) => ({ id: makeId("k"), patternId: pat.id, track: i, start: 0, length })),
     tracks: DEFAULT_TRACKS,
+    master: { ...DEFAULT_MASTER },
+    samples: [],
   };
 }
 
-/* ---------- Version 3 ---------- */
+/* ---------- Versions 3 and 4 (4 adds pan, tone, effects, master and samples) ---------- */
 
-function readChannel(raw: unknown): Channel | null {
+function readChannel(raw: unknown, sampleIds: Set<string>): Channel | null {
   if (!isObject(raw) || !isId(raw.id)) return null;
+  const extra = {
+    pan: num(raw.pan, -1, 1, 0),
+    tone: readTone(raw.tone),
+    fx: readFx(raw.fx),
+    sample: isId(raw.sample) && sampleIds.has(raw.sample) ? raw.sample : null,
+  };
   if (raw.kind === "drum" && isDrum(raw.sound)) {
-    return { ...drumChannel(raw.sound, text(raw.name, DRUM_NAMES[raw.sound]), raw.id), ...readMix(raw) };
+    return { ...drumChannel(raw.sound, text(raw.name, DRUM_NAMES[raw.sound]), raw.id), ...readMix(raw), ...extra };
   }
   if (raw.kind === "synth" && isSynth(raw.sound)) {
     const ch = synthChannel(raw.sound, undefined, raw.id);
-    return { ...ch, name: text(raw.name, ch.name), ...readMix(raw) };
+    return { ...ch, name: text(raw.name, ch.name), ...readMix(raw), ...extra };
   }
   return null;
 }
 
 function readV3(data: Raw): Project {
+  const sampleIdSet = new Set<string>();
+  const samples = list(data.samples)
+    .map(readSample)
+    .filter((x): x is SampleInfo => !!x && !sampleIdSet.has(x.id) && !!sampleIdSet.add(x.id));
   const timeSig = clampTimeSig(data.timeSig);
   const ids = new Set<string>();
   const channels = list(data.channels)
-    .map(readChannel)
+    .map((c) => readChannel(c, sampleIdSet))
     .filter((c): c is Channel => !!c && !ids.has(c.id) && !!ids.add(c.id));
   if (!channels.some((c) => c.kind === "synth")) channels.push(synthChannel("lead"));
   const drumIds = new Set(channels.filter((c) => c.kind === "drum").map((c) => c.id));
@@ -233,7 +310,18 @@ function readV3(data: Raw): Project {
 
   const usedTracks = clips.reduce((m, c) => Math.max(m, c.track + 1), 0);
   const tracks = Math.min(MAX_TRACKS, Math.max(DEFAULT_TRACKS, usedTracks, Number.isInteger(data.tracks) ? (data.tracks as number) : 0));
-  return { version: 3, bpm: clampBpm(data.bpm), timeSig, swing: clampSwing(data.swing), channels, patterns, clips, tracks };
+  return {
+    version: 4,
+    bpm: clampBpm(data.bpm),
+    timeSig,
+    swing: clampSwing(data.swing),
+    channels,
+    patterns,
+    clips,
+    tracks,
+    master: readMaster(data.master),
+    samples,
+  };
 }
 
 /**
@@ -255,7 +343,16 @@ export function parseProject(textIn: string): ParseResult {
   if (typeof data.version !== "number" || data.version > FILE_VERSION) {
     return { ok: false, error: "That project was made by a newer version of Steplab." };
   }
-  if (data.version < 3) return { ok: true, project: upgrade(readOld(data)) };
-  if (!Array.isArray(data.channels)) return { ok: true, project: { ...emptyProject(), bpm: clampBpm(data.bpm) } };
-  return { ok: true, project: readV3(data) };
+  if (data.version < 3) return { ok: true, project: upgrade(readOld(data)), sampleData: {} };
+  if (!Array.isArray(data.channels)) return { ok: true, project: { ...emptyProject(), bpm: clampBpm(data.bpm) }, sampleData: {} };
+  const project = readV3(data);
+  // Embedded audio for the project's own user samples, kept as base64 text.
+  const sampleData: SampleData = {};
+  if (isObject(data.sampleData)) {
+    for (const s of project.samples) {
+      const b64 = data.sampleData[s.id];
+      if (s.source === "user" && typeof b64 === "string" && /^[A-Za-z0-9+/=]+$/.test(b64)) sampleData[s.id] = b64;
+    }
+  }
+  return { ok: true, project, sampleData };
 }

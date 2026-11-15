@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   addClip,
+  addSample,
+  setChannelFx,
+  setChannelPan,
+  setChannelSample,
+  setChannelTone,
+  setMaster,
   addNote,
   demoProject,
   drumChannels,
@@ -36,7 +42,7 @@ describe("version 3 files", () => {
 
   it("are tagged so other JSON is not mistaken for a project", () => {
     const data = JSON.parse(serializeProject(emptyProject()));
-    expect(data).toMatchObject({ app: "steplab", version: 3 });
+    expect(data).toMatchObject({ app: "steplab", version: 4 });
   });
 
   it("drop clips, rows and channels that do not add up", () => {
@@ -77,7 +83,7 @@ describe("parseProject rejects", () => {
   it("text that is not JSON, other JSON, and newer files", () => {
     expect(parseProject("{nope")).toEqual({ ok: false, error: "That file is not valid JSON." });
     for (const text of ["[]", "null", "42", JSON.stringify({ app: "other" })]) expect(parseProject(text).ok).toBe(false);
-    expect(parseProject(JSON.stringify({ app: "steplab", version: 4 })).ok).toBe(false);
+    expect(parseProject(JSON.stringify({ app: "steplab", version: 5 })).ok).toBe(false);
   });
 });
 
@@ -97,7 +103,7 @@ describe("older files become a song", () => {
       ],
     });
     const p = parseOk(v2);
-    expect(p).toMatchObject({ version: 3, bpm: 100, timeSig: { beats: 3, unit: 4 }, swing: 0.2 });
+    expect(p).toMatchObject({ version: 4, bpm: 100, timeSig: { beats: 3, unit: 4 }, swing: 0.2 });
     expect(p.channels.map((c) => c.name)).toEqual(["Kick", "Snare", "Closed hat", "Open hat", "Clap", "Tom", "Melody 1", "Melody 2"]);
     expect(p.channels[0]).toMatchObject({ volume: 0.5, muted: true });
     expect(p.channels[6]).toMatchObject({ kind: "synth", sound: "pad", volume: 0.7 });
@@ -128,5 +134,54 @@ describe("older files become a song", () => {
     expect((p.patterns[1] as MelodyPattern).notes.map((x) => [x.step, x.pitch, x.length])).toEqual([[2, 48, 4], [2, 55, 4]]);
     expect((p.patterns[2] as MelodyPattern).notes.map((x) => [x.step, x.pitch])).toEqual([[0, 48]]);
     expect(p.clips[0]!.length).toBe(64);
+  });
+});
+
+describe("version 4 sound settings and samples", () => {
+  it("round trip tone, effects, pan, master and samples, with embedded audio", () => {
+    let p = demoProject();
+    const lead = synthChannels(p)[0]!.id;
+    p = setChannelTone(p, lead, { cutoff: 0.4, resonance: 0.3, octave: -1, glide: 0.2 });
+    p = setChannelFx(p, lead, { low: -3, high: 4.5, comp: 0.5, reverb: 0.3, delay: 0.2 });
+    p = setChannelPan(p, lead, -0.25);
+    p = setMaster(p, { volume: 0.7, delayTime: "4n", delayFeedback: 0.5, reverbSize: 0.8 });
+    p = addSample(p, { id: "s1", name: "Chop", source: "user", root: 62 });
+    p = addSample(p, { id: "b1", name: "Piano C4", source: "bundled", url: "samples/piano/C4.mp3", root: 60 });
+    p = setChannelSample(p, lead, "s1");
+    const r = parseProject(serializeProject(p, false, { s1: "AAAA" }));
+    if (!r.ok) throw new Error(r.error);
+    expect(r.project).toEqual(p);
+    expect(r.sampleData).toEqual({ s1: "AAAA" });
+  });
+
+  it("fill missing version 3 fields with defaults", () => {
+    const raw = JSON.parse(serializeProject(demoProject()));
+    raw.version = 3;
+    delete raw.master;
+    delete raw.samples;
+    for (const c of raw.channels) {
+      delete c.pan;
+      delete c.tone;
+      delete c.fx;
+      delete c.sample;
+    }
+    const q = parseOk(JSON.stringify(raw));
+    expect(q.master).toMatchObject({ volume: 0.85, delayTime: "8n." });
+    expect(q.channels[0]).toMatchObject({ pan: 0, sample: null, tone: { cutoff: 1 }, fx: { reverb: 0 } });
+  });
+
+  it("refuse unsafe bundled paths, unknown sample references and junk audio", () => {
+    const raw = JSON.parse(serializeProject(demoProject()));
+    raw.samples = [
+      { id: "x", name: "Bad", source: "bundled", url: "../secret" },
+      { id: "y", name: "Ok", source: "user", root: 999 },
+    ];
+    raw.channels[0].sample = "x";
+    raw.sampleData = { y: "not base64!", x: "AAAA" };
+    const r = parseProject(JSON.stringify(raw));
+    if (!r.ok) throw new Error(r.error);
+    expect(r.project.samples).toEqual([{ id: "y", name: "Ok", source: "user", root: 127 }]);
+    expect(r.project.channels[0]!.sample).toBeNull();
+    expect(r.sampleData).toEqual({});
   });
 });

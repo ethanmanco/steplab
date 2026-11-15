@@ -10,8 +10,13 @@ import {
   stepsPerBar,
 } from "./timing";
 import {
+  DELAY_TIMES,
   DRUM_IDS,
   type Channel,
+  type ChannelFx,
+  type Master,
+  type SampleInfo,
+  type ToneShape,
   type Clip,
   type DrumId,
   type DrumPattern,
@@ -61,14 +66,26 @@ type SoundRef = { kind: "drum"; sound: DrumId } | { kind: "synth"; sound: SynthI
 
 export const soundName = (c: SoundRef) => (c.kind === "drum" ? DRUM_NAMES[c.sound] : SYNTHS[c.sound].name);
 
-const mix = { volume: DEFAULT_VOLUME, muted: false, solo: false };
+export const DEFAULT_TONE: ToneShape = { cutoff: 1, resonance: 0, attack: 0.5, release: 0.5, octave: 0, glide: 0 };
+export const DEFAULT_FX: ChannelFx = { low: 0, mid: 0, high: 0, comp: 0, reverb: 0, delay: 0 };
+export const DEFAULT_MASTER: Master = { volume: 0.85, reverbSize: 0.5, delayTime: "8n.", delayFeedback: 0.35 };
+
+const mix = () => ({
+  volume: DEFAULT_VOLUME,
+  muted: false,
+  solo: false,
+  pan: 0,
+  tone: { ...DEFAULT_TONE },
+  fx: { ...DEFAULT_FX },
+  sample: null,
+});
 
 export function drumChannel(sound: DrumId, name = DRUM_NAMES[sound], id = makeId("c")): Channel {
-  return { id, kind: "drum", sound, name, ...mix };
+  return { id, kind: "drum", sound, name, ...mix() };
 }
 
 export function synthChannel(sound: SynthId, name = SYNTHS[sound].name, id = makeId("c")): Channel {
-  return { id, kind: "synth", sound, name, ...mix };
+  return { id, kind: "synth", sound, name, ...mix() };
 }
 
 export const patternSteps = (pattern: Pattern, sig: TimeSignature) => pattern.bars * stepsPerBar(sig);
@@ -103,7 +120,7 @@ export function emptyProject(): Project {
   const melody = newMelodyPattern("Melody 1", channels.find((c) => c.kind === "synth")!.id);
   const bar = stepsPerBar(DEFAULT_TIME_SIG);
   return {
-    version: 3,
+    version: 4,
     bpm: DEFAULT_BPM,
     timeSig: { ...DEFAULT_TIME_SIG },
     swing: 0,
@@ -114,6 +131,8 @@ export function emptyProject(): Project {
       { id: makeId("k"), patternId: melody.id, track: 1, start: 0, length: bar },
     ],
     tracks: DEFAULT_TRACKS,
+    master: { ...DEFAULT_MASTER },
+    samples: [],
   };
 }
 
@@ -144,7 +163,7 @@ export function demoProject(): Project {
     notes: [note(0, 36, 3), note(3, 36, 2), note(6, 39, 3), note(10, 43, 3), note(14, 41, 2)],
   };
   return {
-    version: 3,
+    version: 4,
     bpm: DEFAULT_BPM,
     timeSig: { ...DEFAULT_TIME_SIG },
     swing: 0,
@@ -156,6 +175,8 @@ export function demoProject(): Project {
       { id: makeId("k"), patternId: hook.id, track: 2, start: 32, length: 32 },
     ],
     tracks: DEFAULT_TRACKS,
+    master: { ...DEFAULT_MASTER },
+    samples: [],
   };
 }
 
@@ -484,4 +505,77 @@ export function setSwing(p: Project, swing: unknown): Project {
 export function setTimeSig(p: Project, sig: TimeSignature): Project {
   const timeSig = clampTimeSig(sig);
   return { ...p, timeSig, patterns: p.patterns.map((x) => ({ ...x, bars: clampBars(x.bars, timeSig) })) };
+}
+
+/* ---------- Sound shaping, mixer and samples ---------- */
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const mapChannel = (p: Project, id: string, fn: (c: Channel) => Channel): Project => ({
+  ...p,
+  channels: p.channels.map((c) => (c.id === id ? fn(c) : c)),
+});
+
+export function setChannelPan(p: Project, id: string, pan: number): Project {
+  if (!Number.isFinite(pan)) return p;
+  return mapChannel(p, id, (c) => ({ ...c, pan: clamp(pan, -1, 1) }));
+}
+
+/** Change some of a channel's tone knobs; each is kept in its range. */
+export function setChannelTone(p: Project, id: string, patch: Partial<ToneShape>): Project {
+  return mapChannel(p, id, (c) => {
+    const t = { ...c.tone };
+    for (const [k, v] of Object.entries(patch) as [keyof ToneShape, number][]) {
+      if (!Number.isFinite(v)) continue;
+      t[k] = k === "octave" ? clamp(Math.round(v), -2, 2) : clamp(v, 0, 1);
+    }
+    return { ...c, tone: t };
+  });
+}
+
+/** Change some of a channel's mixer insert settings; EQ bands are -12..12 dB, the rest 0..1. */
+export function setChannelFx(p: Project, id: string, patch: Partial<ChannelFx>): Project {
+  return mapChannel(p, id, (c) => {
+    const f = { ...c.fx };
+    for (const [k, v] of Object.entries(patch) as [keyof ChannelFx, number][]) {
+      if (!Number.isFinite(v)) continue;
+      f[k] = k === "low" || k === "mid" || k === "high" ? clamp(v, -12, 12) : clamp(v, 0, 1);
+    }
+    return { ...c, fx: f };
+  });
+}
+
+export function resetChannelSound(p: Project, id: string): Project {
+  return mapChannel(p, id, (c) => ({ ...c, tone: { ...DEFAULT_TONE }, fx: { ...DEFAULT_FX }, pan: 0 }));
+}
+
+export function setMaster(p: Project, patch: Partial<Master>): Project {
+  const m = { ...p.master };
+  if (patch.volume !== undefined && Number.isFinite(patch.volume)) m.volume = clamp(patch.volume, 0, 1);
+  if (patch.reverbSize !== undefined && Number.isFinite(patch.reverbSize)) m.reverbSize = clamp(patch.reverbSize, 0, 1);
+  if (patch.delayFeedback !== undefined && Number.isFinite(patch.delayFeedback)) m.delayFeedback = clamp(patch.delayFeedback, 0, 0.9);
+  if (patch.delayTime && (DELAY_TIMES as readonly string[]).includes(patch.delayTime)) m.delayTime = patch.delayTime;
+  return { ...p, master: m };
+}
+
+/** Add an audio file to the project's sample list (or update one with the same id). */
+export function addSample(p: Project, info: SampleInfo): Project {
+  const root = Number.isInteger(info.root) ? clamp(info.root, 0, 127) : 60;
+  const clean: SampleInfo = { ...info, name: info.name.trim().slice(0, 60) || "Sample", root };
+  const exists = p.samples.some((s) => s.id === info.id);
+  return { ...p, samples: exists ? p.samples.map((s) => (s.id === info.id ? clean : s)) : [...p.samples, clean] };
+}
+
+/** Remove a sample; channels that played it go back to their built-in sound. */
+export function removeSample(p: Project, id: string): Project {
+  return {
+    ...p,
+    samples: p.samples.filter((s) => s.id !== id),
+    channels: p.channels.map((c) => (c.sample === id ? { ...c, sample: null } : c)),
+  };
+}
+
+/** Make a channel play a sample, or its built-in sound again with null. */
+export function setChannelSample(p: Project, id: string, sampleId: string | null): Project {
+  if (sampleId !== null && !p.samples.some((s) => s.id === sampleId)) return p;
+  return mapChannel(p, id, (c) => ({ ...c, sample: sampleId }));
 }
