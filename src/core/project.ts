@@ -46,8 +46,9 @@ export function makeId(prefix: string): string {
   return `${prefix}${idCount.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
-export const soundName = (c: Pick<Channel, "kind" | "sound">) =>
-  c.kind === "drum" ? DRUM_NAMES[c.sound] : SYNTHS[c.sound].name;
+type SoundRef = { kind: "drum"; sound: DrumId } | { kind: "synth"; sound: SynthId };
+
+export const soundName = (c: SoundRef) => (c.kind === "drum" ? DRUM_NAMES[c.sound] : SYNTHS[c.sound].name);
 
 const mix = { volume: DEFAULT_VOLUME, muted: false, solo: false };
 

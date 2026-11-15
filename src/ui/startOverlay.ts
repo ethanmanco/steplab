@@ -15,7 +15,7 @@ export function showStartOverlay(app: HTMLElement, onStart: () => Promise<void>)
       "div",
       { class: "start-card" },
       h("h1", { id: "start-title", class: "logo" }, "Steplab"),
-      h("p", { class: "start-lede" }, "A tiny beat maker. Six drums, two melodies, one loop."),
+      h("p", { class: "start-lede" }, "A small beat maker. Build drum loops and melodies, then arrange them into a song."),
       button,
       h("p", { class: "start-note" }, "Your browser keeps sound off until you click. Headphones recommended."),
       error,

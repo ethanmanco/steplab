@@ -139,7 +139,7 @@ export function numberField(opts: {
 
 export interface TrackHead {
   el: HTMLElement;
-  update(mix: TrackMix): void;
+  update(mix: TrackMix, name?: string): void;
 }
 
 /** Name, mute, solo, a volume fader and a typed volume percent for one track. */
@@ -175,16 +175,28 @@ export function trackHead(opts: {
     },
     onCommit: (v) => opts.onVolume(v / 100),
   });
+  let shownName = opts.name;
+  const nameEl = h("span", { class: "track-name" }, opts.name);
   const el = h(
     "div",
     { class: "track-head" },
-    h("span", { class: "track-name" }, opts.name),
+    nameEl,
     h("div", { class: "track-mix" }, mute, solo, fader, percent.el),
   );
   return {
     el,
-    update(next) {
+    update(next, name) {
       mix = next;
+      if (name !== undefined && name !== shownName) {
+        shownName = name;
+        nameEl.textContent = name;
+        setAttr(mute, "aria-label", `Mute ${name}`);
+        setAttr(mute, "title", `Mute ${name}`);
+        setAttr(solo, "aria-label", `Solo ${name}`);
+        setAttr(solo, "title", `Solo ${name}`);
+        setAttr(fader, "aria-label", `${name} volume`);
+        setAttr(percent.input, "aria-label", `${name} volume, percent`);
+      }
       setAttr(mute, "aria-pressed", String(next.muted));
       setAttr(solo, "aria-pressed", String(next.solo));
       el.classList.toggle("is-muted", next.muted);

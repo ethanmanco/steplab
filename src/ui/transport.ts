@@ -1,6 +1,6 @@
-import { MAX_BEATS, MAX_BPM, MIN_BPM, maxBarsFor } from "../core/timing";
-import type { TimeSignature } from "../core/types";
-import { numberField } from "./controls";
+import { MAX_BEATS, MAX_BPM, MIN_BPM } from "../core/timing";
+import type { PlayMode, TimeSignature } from "../core/types";
+import { numberField, segmented } from "./controls";
 import { ICONS, h, setAttr, svgIcon } from "./dom";
 import type { AppState } from "./store";
 
@@ -10,7 +10,7 @@ export interface TransportActions {
   toggleRecord(): void;
   toggleMetronome(): void;
   setBpm(bpm: number): void;
-  setBars(bars: number): void;
+  setMode(mode: PlayMode): void;
   setTimeSig(sig: TimeSignature): void;
   setSwing(swing: number): void;
 }
@@ -83,8 +83,18 @@ export function createTransport(actions: TransportActions) {
   );
   const meter = h("div", { class: "field", role: "group", "aria-label": "Time signature" }, h("span", { class: "field-label", "aria-hidden": "true" }, "Time"), beats.el, h("span", { class: "slash", "aria-hidden": "true" }, "/"), unit);
 
-  const bars = numberField({ label: "Bars in the loop", min: 1, max: 16, className: "num-2", onCommit: (b) => actions.setBars(Math.round(b)) });
-  const barsField = h("div", { class: "field" }, h("span", { class: "field-label", "aria-hidden": "true" }, "Bars"), bars.el);
+  // Pattern mode loops the pattern being edited; Song mode plays the playlist.
+  const mode = segmented<PlayMode>({
+    legend: "Play mode",
+    hideLegend: true,
+    options: [
+      { value: "pattern", label: "PAT", title: "Pattern mode: loop the selected pattern" },
+      { value: "song", label: "SONG", title: "Song mode: play the whole playlist" },
+    ],
+    value: "song",
+    onChange: actions.setMode,
+    className: "seg-mode",
+  });
 
   const swing = h("input", {
     type: "range",
@@ -104,9 +114,9 @@ export function createTransport(actions: TransportActions) {
     "div",
     { class: "transport", role: "group", "aria-label": "Transport" },
     h("div", { class: "transport-buttons" }, play, stop, record, metro),
+    mode.el,
     tempo,
     meter,
-    barsField,
     swingField,
     status,
   );
@@ -141,8 +151,7 @@ export function createTransport(actions: TransportActions) {
       sig = project.timeSig;
       beats.set(sig.beats);
       unit.value = String(sig.unit);
-      bars.set(project.bars);
-      setAttr(bars.input, "title", `1 to ${maxBarsFor(sig)} bars`);
+      mode.setValue(s.mode);
       const sw = Math.round(project.swing * 100);
       if (swing.value !== String(sw)) swing.value = String(sw);
       setAttr(swing, "aria-valuetext", `${sw}%`);

@@ -1,6 +1,8 @@
 import type { PlayState } from "../audio/engine";
-import type { Project } from "../core/types";
-import type { DrawLength } from "./melodyPanel";
+import type { PlayMode, Project } from "../core/types";
+
+/** Note lengths for clicked notes: steps, or a whole bar. */
+export type DrawLength = 1 | 2 | 4 | 8 | "bar";
 
 /** Settings that belong to the person, not the song. Kept between visits. */
 export interface Prefs {
@@ -12,9 +14,11 @@ export interface Prefs {
   keys: boolean;
   /** MIDI note of the Z key. */
   keysBase: number;
-  /** Step width in pixels. */
+  /** Step width in the editors, in pixels. */
   zoom: number;
-  /** Scroll the grids along with the playhead. */
+  /** Bar width in the playlist, in pixels. */
+  barWidth: number;
+  /** Scroll along with the playhead. */
   follow: boolean;
 }
 
@@ -22,8 +26,13 @@ export interface AppState {
   project: Project;
   playState: PlayState;
   recordArmed: boolean;
-  /** Which melody track the piano roll is showing. */
-  activeMelody: number;
+  mode: PlayMode;
+  /** The pattern Pattern mode plays and new clips are drawn with. */
+  current: string | null;
+  /** Patterns open in the editor windows. */
+  openDrums: string | null;
+  openRoll: string | null;
+  selectedClip: string | null;
   drawLength: DrawLength;
   prefs: Prefs;
   canUndo: boolean;
