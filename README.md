@@ -9,7 +9,12 @@ A small beat maker that runs in the browser, built around the core of FL Studio:
 ## What you can do
 
 - **Channels:** every sound is a channel with its own name, mute, solo, volume fader and a box for an exact volume percent. New songs start with an 808 kit plus a Lead and an 808 bass, and you can add as many drum or synth channels as you like. Click a name to rename it; change its sound from the list.
-- **Sounds:** an 808 kit (kick, snare, closed and open hats, clap, tom, rimshot, cowbell), a classic kit (kick, snare, hats, clap, tom), and five synths: Lead, Bass, 808, Pluck and Pad. **Add 808 kit** drops the whole 808 set into any song.
+- **Synthesized sounds:** an 808 kit (kick, snare, closed and open hats, clap, tom, rimshot, cowbell), a classic kit, and 17 synths: Lead, Bass, 808, Pluck, Pad, Electric piano, Piano, Strings, Brass, Bell, Organ, Supersaw, Marimba, Flute, Sub bass, Reese bass and Chiptune. **Add 808 kit** drops the whole 808 set into any song.
+- **Recorded sounds:** a built-in library of 35 real instrument samples, all public domain (CC0): grand piano, FM piano, clavinet, pipe organ, marimba, vibraphone, glockenspiel, xylophone, kalimba, tubular bells, harp, violins (sustained and pizzicato), cellos, flute, French horn, trumpet, tenor sax, an acoustic drum kit and ten hand percussion sounds. Pick one from **Add channel**.
+- **Your own samples:** load any WAV, MP3, OGG or FLAC file as a one-shot drum or a pitched instrument, like FL Studio's Sampler. Samples are kept in your browser and travel inside saved project files.
+- **Channel settings** (the **Edit** button on a channel): swap the sound or sample, set a sample's root note, and shape it with cutoff, resonance, attack, release, octave, glide and pan.
+- **Mixer** (F9): a strip for every channel with a three band EQ, compression, reverb and delay sends, pan and a fader, plus a master strip that sets the reverb size and the tempo-synced delay.
+- **MIDI:** **MIDI** exports the song (or the current pattern in PAT mode) as a standard MIDI file that opens in FL Studio and other DAWs with its parts laid out, drums on channel 10. **Open** also accepts .mid files and adds their melodies and drums to your song.
 - **Patterns:** make as many **drum loops** and **melodies** as you need, each with its own name and length. Copy one to make a variation.
 - **Playlist:** the whole song at a glance. Every pattern you place shows up as a clip with a small picture of its notes. Drag clips to move them between bars and tracks, drag the right edge to repeat them longer, right-click to delete. Click an empty spot to place the selected pattern there.
 - **Editor windows:** double-click a clip and its editor opens in a window over the playlist, like FL Studio. Drum loops open in a step sequencer: click a step, or drag across steps to paint or erase. Melodies open in a four octave piano roll: click to place a note, drag right to make it longer, click a note to delete it, stack notes for chords. Drag windows by their title bar and resize them from the corner.
@@ -47,7 +52,7 @@ Steplab follows FL Studio shortcuts where it can. Press `F1` in the app for this
 | Numpad `+` / `-` | Next or previous pattern |
 | `Ctrl` + `S`, `Ctrl` + `O`, `Ctrl` + `R` | Save, open, export WAV |
 | `Ctrl` + `Z` (or `Ctrl` + `Alt` + `Z`), `Ctrl` + `Y` | Undo, redo |
-| `F5`, `F6`, `F7`, `F1` | Playlist, channel rack, piano roll, shortcut list |
+| `F5`, `F6`, `F7`, `F9`, `F1` | Playlist, channel rack, piano roll, mixer, shortcut list |
 | `Alt` + drag in the playlist | Move or stretch a clip without snapping |
 | `Ctrl` + `B` on a clip | Duplicate it after itself |
 | `Ctrl` + `C`, `Ctrl` + `V` on a clip | Copy, then paste after the selected clip |
@@ -66,7 +71,11 @@ Clips are real buttons, and the playlist has a toolbar (Edit, Copy, Delete, move
 
 - **Vite + TypeScript**, with plain DOM code and no UI framework. A small element helper and a tiny store do the job. The grids only touch the squares that changed, so even a 16 bar piano roll (over 12,000 buttons) rebuilds in about 60 ms and a single edit takes about 1 ms. Playlist clips draw their note pictures once as SVG and tile them.
 - **[Tone.js](https://tonejs.github.io/)** for audio scheduling and synthesis.
-- **Every sound is synthesized in code.** There are no audio samples, so there are no licensing questions. The Roland TR-808 made its sounds with analog circuits rather than recordings, so its recipes translate directly: the 808 kick is a sine that drops in pitch over a long decay, the snare is two tuned tones plus filtered noise, the cowbell is two square waves at 540 and 800 Hz through a band-pass filter, and the 808 bass is a sine with a short pitch "knock", a long body and a little saturation so it carries on small speakers. The melody sounds are polyphonic subtractive and FM synths.
+- **Synthesized sounds are built in code.** The Roland TR-808 made its sounds with analog circuits rather than recordings, so its recipes translate directly: the 808 kick is a sine that drops in pitch over a long decay, the snare is two tuned tones plus filtered noise, the cowbell is two square waves at 540 and 800 Hz through a band-pass filter, and the 808 bass is a sine with a short pitch "knock", a long body and a little saturation so it carries on small speakers. The melody sounds are polyphonic subtractive and FM synths, level-matched by measuring each one's peak.
+- **Recorded sounds are public domain.** The library in `public/samples` is a hand-picked set from two CC0 libraries by Versilian Studios, trimmed, converted to compact mono WAV and pitch-checked with a YIN pitch detector (the source libraries name notes an octave lower than scientific pitch). See `public/samples/CREDITS.md`.
+- **A mixer modeled on FL Studio's.** Every channel runs through an insert strip: tone filter, three band EQ (shelving and peaking filters, exactly flat at 0 dB), compressor, pan and fader, with sends to a shared reverb and a delay synced to the tempo.
+- **Samples live in IndexedDB.** localStorage is far too small for audio, so user samples are stored in the browser's IndexedDB, decoded once and shared by playback and WAV export, and embedded as base64 when you save a project file.
+- **MIDI files are written and read by hand**: a small Standard MIDI File encoder and decoder (running status, note-on velocity 0, type 0 and type 1 files), with General MIDI drum notes and program numbers so parts land on sensible instruments in other DAWs.
 - **Web MIDI** for keyboards, in Chrome, Edge and Firefox (Safari does not support it).
 - **Vitest** for the timing, pattern, recording, file, MIDI and WAV logic.
 
@@ -137,12 +146,14 @@ Pushing to `main` runs the tests, builds the site and deploys it to GitHub Pages
 
 Deliberately left out so far:
 
-- Recording audio
-- Importing your own samples
-- Effects such as reverb and delay, and a full mixer with sends
+- Recording audio from a microphone
+- More effects (chorus, distortion, sidechain)
 - Automation clips
+- Multi-sample instruments (several recordings per instrument for a more natural sound across the keyboard)
 - Accounts and sharing
 
 ## Credits
+
+Recorded samples: [Versilian Community Sample Library](https://github.com/sgossner/VCSL) and [VSCO 2 Community Edition](https://github.com/sgossner/VSCO-2-CE) by Versilian Studios and Ivy Audio, released under CC0. Thank you.
 
 Built with Claude Code. I designed, directed, reviewed, and tested it.

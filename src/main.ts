@@ -346,6 +346,22 @@ const sidebar = createSidebar({
     });
   },
   openSettings: (id) => store.set({ openChannel: id }),
+  addLibraryChannel(libraryId) {
+    const item = library.find((x) => x.id === libraryId);
+    if (!item) return;
+    const sampleId = `lib-${item.id}`;
+    const p0 = project();
+    const ch: Channel =
+      item.kind === "oneshot" ? drumChannel("kick808", uniqueChannelName(p0, item.name)) : synthChannel("piano", uniqueChannelName(p0, item.name));
+    edit((p) =>
+      setChannelSample(
+        addChannel(addSample(p, { id: sampleId, name: item.name, source: "bundled", url: item.url, root: item.root }), ch),
+        ch.id,
+        sampleId,
+      ),
+    );
+    toast.show(`Added ${item.name}${item.kind === "oneshot" ? " to the drum loops" : ". Use it in a melody"}.`);
+  },
   addKit808() {
     const have = new Set(project().channels.filter((c) => c.kind === "drum").map((c) => c.sound));
     const missing = DRUMS_808.filter((d) => !have.has(d));
@@ -599,6 +615,7 @@ void fetch(`${import.meta.env.BASE_URL}samples/manifest.json`)
       (x): x is LibrarySample =>
         typeof x?.id === "string" && typeof x?.name === "string" && typeof x?.url === "string" && typeof x?.group === "string",
     );
+    sidebar.setLibrary(library);
     render();
   })
   .catch(() => undefined);

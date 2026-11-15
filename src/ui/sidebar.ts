@@ -9,6 +9,7 @@ import type { AppState } from "./store";
 export interface SidebarActions {
   addChannel(kind: "drum" | "synth", sound: DrumId | SynthId): void;
   addSampleChannel(kind: "drum" | "synth"): void;
+  addLibraryChannel(libraryId: string): void;
   openSettings(id: string): void;
   removeChannel(id: string): void;
   renameChannel(id: string): void;
@@ -96,6 +97,7 @@ export function createSidebar(actions: SidebarActions) {
       onclick: () => {
         const [kind, sound] = addSelect.value.split(":");
         if (kind === "sample") actions.addSampleChannel(sound === "synth" ? "synth" : "drum");
+        else if (kind === "lib") actions.addLibraryChannel(addSelect.value.slice(4));
         else actions.addChannel(kind as "drum" | "synth", sound as DrumId | SynthId);
       },
     },
@@ -183,7 +185,18 @@ export function createSidebar(actions: SidebarActions) {
     if (hadFocus) patList.querySelector<HTMLElement>(`[data-focus-key="${hadFocus}"]`)?.focus();
   }
 
+  const builtIn = [...addSelect.children];
   return {
+    /** List the bundled sample library in the Add channel menu, after the built-in sounds. */
+    setLibrary(list: { id: string; name: string; group: string }[]) {
+      const groups = [...new Set(list.map((x) => x.group))];
+      addSelect.replaceChildren(
+        ...builtIn,
+        ...groups.map((g) =>
+          h("optgroup", { label: `Recorded: ${g}` }, ...list.filter((x) => x.group === g).map((x) => h("option", { value: `lib:${x.id}` }, x.name))),
+        ),
+      );
+    },
     el: h("div", { class: "sidebar" }, patterns, rack),
     /** F6: put focus in the channel rack. */
     focusRack() {

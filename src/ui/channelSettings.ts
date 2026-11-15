@@ -12,6 +12,9 @@ export interface LibrarySample {
   url: string;
   root: number;
   group: string;
+  /** "oneshot" suits drum channels, "melodic" suits synth channels. */
+  kind?: "oneshot" | "melodic";
+  source?: string;
 }
 
 export interface ChannelSettingsActions {
@@ -140,10 +143,12 @@ export function createChannelSettings(getState: () => AppState, actions: Channel
       if (sound.value !== ch.sound) sound.value = ch.sound;
 
       const lib = library();
-      const key = `${s.project.samples.map((x) => `${x.id}:${x.name}`).join()}|${lib.length}`;
+      const key = `${ch.kind}|${s.project.samples.map((x) => `${x.id}:${x.name}`).join()}|${lib.length}`;
       if (sampleKey !== key) {
         sampleKey = key;
-        const groups = [...new Set(lib.map((x) => x.group))];
+        // Show the sounds that suit this channel first: hits for drums, instruments for synths.
+        const suits = (x: LibrarySample) => (ch.kind === "drum" ? x.kind === "oneshot" : x.kind !== "oneshot");
+        const groups = [...new Set([...lib.filter(suits), ...lib.filter((x) => !suits(x))].map((x) => x.group))];
         sample.replaceChildren(
           h("option", { value: "" }, "None: built-in sound"),
           ...(s.project.samples.length
