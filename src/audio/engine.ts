@@ -62,7 +62,14 @@ export class Engine {
     transport.stop();
     transport.position = 0;
     Tone.getDraw().cancel(0);
+    this.graph?.silence();
     this.onStep(-1);
+  }
+
+  /** Let people hear a note as they place it while stopped. */
+  previewNote(track: number, row: number): void {
+    if (!this.graph || this.playing) return;
+    this.graph.previewNote(this.project, track, row, Tone.now() + 0.01);
   }
 
   /** Let people hear a drum as they place it while stopped. */
