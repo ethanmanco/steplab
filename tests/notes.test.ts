@@ -52,7 +52,7 @@ describe("piano roll range", () => {
   });
 
   it("keeps the demo melodies on the roll", () => {
-    for (const m of demoProject().melodies) {
+    for (const m of demoProject().patterns.flatMap((x) => (x.kind === "melody" ? [x] : []))) {
       expect(m.notes.length).toBeGreaterThan(0);
       for (const n of m.notes) expect(inRollRange(n.pitch)).toBe(true);
     }

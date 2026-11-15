@@ -17,14 +17,14 @@ export interface TrackMix {
   solo: boolean;
 }
 
-export interface DrumTrack extends TrackMix {
-  id: DrumId;
-  /** Sorted step numbers that have a hit. Steps past the loop end are kept but silent. */
-  steps: number[];
-}
+/** One sound in the channel rack: a drum or a synth, with its own mixer strip. */
+export type Channel = TrackMix & { id: string; name: string } & (
+    | { kind: "drum"; sound: DrumId }
+    | { kind: "synth"; sound: SynthId }
+  );
 
 export interface Note {
-  /** Step the note starts on (a sixteenth note grid). */
+  /** Step the note starts on (a sixteenth note grid), from the pattern start. */
   step: number;
   /** MIDI note number, so 60 is middle C. */
   pitch: number;
@@ -34,19 +34,50 @@ export interface Note {
   velocity: number;
 }
 
-export interface MelodyTrack extends TrackMix {
-  synth: SynthId;
+/** A drum loop: steps for every drum channel. */
+export interface DrumPattern {
+  id: string;
+  kind: "drums";
+  name: string;
+  bars: number;
+  /** Sorted step numbers per drum channel id. */
+  rows: Record<string, number[]>;
+}
+
+/** A melody: notes played by one synth channel. */
+export interface MelodyPattern {
+  id: string;
+  kind: "melody";
+  name: string;
+  bars: number;
+  channelId: string;
   /** Sorted by step, then pitch. */
   notes: Note[];
 }
 
+export type Pattern = DrumPattern | MelodyPattern;
+
+/** A pattern placed on the playlist. Positions are in steps from the song start. */
+export interface Clip {
+  id: string;
+  patternId: string;
+  track: number;
+  start: number;
+  /** May be longer than the pattern (it repeats) or shorter (it is cut). */
+  length: number;
+}
+
 export interface Project {
-  version: 2;
+  version: 3;
   bpm: number;
-  bars: number;
   timeSig: TimeSignature;
   /** 0..1: how far every second sixteenth is pushed late. */
   swing: number;
-  drums: DrumTrack[];
-  melodies: MelodyTrack[];
+  channels: Channel[];
+  patterns: Pattern[];
+  clips: Clip[];
+  /** How many playlist tracks to show. */
+  tracks: number;
 }
+
+export type PlayMode = "pattern" | "song";

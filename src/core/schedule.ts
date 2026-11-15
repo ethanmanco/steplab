@@ -1,76 +1,115 @@
-import { loopSteps } from "./timing";
-import type { DrumId, MelodyTrack, Note, Project, SynthId, TrackMix } from "./types";
+import { findPattern, patternSteps, songSteps } from "./project";
+import type { Clip, DrumId, MelodyPattern, Note, Pattern, PlayMode, Project } from "./types";
 
 export interface DrumHit {
-  track: number;
-  id: DrumId;
+  channelId: string;
+  sound: DrumId;
 }
 
 export interface NoteHit {
+  channelId: string;
   pitch: number;
   velocity: number;
   /** How many steps the note should ring. */
   steps: number;
 }
 
-export interface MelodyHit {
-  track: number;
-  synth: SynthId;
+export interface StepEvents {
+  drums: DrumHit[];
   notes: NoteHit[];
 }
 
-export interface StepEvents {
-  drums: DrumHit[];
-  melodies: MelodyHit[];
+/**
+ * Which channels should be heard. Solo works like a mixer: once any channel
+ * is soloed, only soloed channels play. Mute always wins.
+ */
+export function audibleChannels(p: Project): Set<string> {
+  const anySolo = p.channels.some((c) => c.solo);
+  return new Set(p.channels.filter((c) => !c.muted && (!anySolo || c.solo)).map((c) => c.id));
 }
 
 /**
- * Whether a track should be heard. Solo works like a mixer: once any track
- * is soloed, only soloed tracks play. Mute always wins.
+ * How long a note actually rings inside its pattern: its own length, cut
+ * short if the same pitch starts again sooner (looking around the pattern
+ * end), so a repeated pitch never cuts itself off mid-attack.
  */
-export function audibleTracks(project: Project): { drums: boolean[]; melodies: boolean[] } {
-  const all: TrackMix[] = [...project.drums, ...project.melodies];
-  const anySolo = all.some((t) => t.solo);
-  const audible = (t: TrackMix) => !t.muted && (!anySolo || t.solo);
-  return { drums: project.drums.map(audible), melodies: project.melodies.map(audible) };
-}
-
-/**
- * How long a note actually rings: its own length, cut short if the same
- * pitch starts again sooner (looking around the loop end), so a repeated
- * pitch never cuts itself off mid-attack.
- */
-export function playLength(track: MelodyTrack, n: Note, totalSteps: number): number {
+export function playLength(pat: MelodyPattern, n: Note, total: number): number {
   let length = n.length;
-  for (const o of track.notes) {
-    if (o === n || o.pitch !== n.pitch || o.step >= totalSteps) continue;
-    const gap = (o.step - n.step + totalSteps) % totalSteps;
+  for (const o of pat.notes) {
+    if (o === n || o.pitch !== n.pitch || o.step >= total) continue;
+    const gap = (o.step - n.step + total) % total;
     if (gap > 0 && gap < length) length = gap;
   }
   return length;
 }
 
-/**
- * Everything that should sound on one loop step. Pure, so the audio
- * callback stays tiny and the logic can be tested without an AudioContext.
- */
-export function eventsAtStep(project: Project, step: number): StepEvents {
-  const audible = audibleTracks(project);
-  const total = loopSteps(project.bars, project.timeSig);
-  const drums: DrumHit[] = [];
-  project.drums.forEach((d, track) => {
-    if (audible.drums[track] && d.steps.includes(step)) drums.push({ track, id: d.id });
-  });
-  const melodies: MelodyHit[] = [];
-  project.melodies.forEach((m, track) => {
-    if (!audible.melodies[track]) return;
-    const starting = m.notes.filter((n) => n.step === step);
-    if (starting.length === 0) return;
-    melodies.push({
-      track,
-      synth: m.synth,
-      notes: starting.map((n) => ({ pitch: n.pitch, velocity: n.velocity, steps: playLength(m, n, total) })),
+/** What one pattern plays at a step inside it. `limit` cuts notes at a clip's end. */
+function patternEvents(p: Project, pat: Pattern, local: number, audible: Set<string>, limit: number, out: StepEvents) {
+  const total = patternSteps(pat, p.timeSig);
+  if (pat.kind === "drums") {
+    for (const ch of p.channels) {
+      if (ch.kind !== "drum" || !audible.has(ch.id)) continue;
+      if (pat.rows[ch.id]?.includes(local)) out.drums.push({ channelId: ch.id, sound: ch.sound });
+    }
+    return;
+  }
+  if (!audible.has(pat.channelId)) return;
+  for (const n of pat.notes) {
+    if (n.step !== local) continue;
+    out.notes.push({
+      channelId: pat.channelId,
+      pitch: n.pitch,
+      velocity: n.velocity,
+      steps: Math.min(playLength(pat, n, total), limit),
     });
-  });
-  return { drums, melodies };
+  }
+}
+
+/** Pattern mode: loop one pattern on its own. */
+export function patternEventsAtStep(p: Project, patternId: string, step: number): StepEvents {
+  const out: StepEvents = { drums: [], notes: [] };
+  const pat = findPattern(p, patternId);
+  if (!pat) return out;
+  patternEvents(p, pat, step % patternSteps(pat, p.timeSig), audibleChannels(p), Infinity, out);
+  return out;
+}
+
+/** Song mode: everything the playlist plays at a song step. */
+export function songEventsAtStep(p: Project, step: number): StepEvents {
+  const out: StepEvents = { drums: [], notes: [] };
+  const audible = audibleChannels(p);
+  for (const c of p.clips) {
+    if (step < c.start || step >= c.start + c.length) continue;
+    const pat = findPattern(p, c.patternId);
+    if (!pat) continue;
+    patternEvents(p, pat, (step - c.start) % patternSteps(pat, p.timeSig), audible, c.start + c.length - step, out);
+  }
+  return out;
+}
+
+/** How many steps the transport loops over in a mode. */
+export function loopLength(p: Project, mode: PlayMode, patternId: string | null): number {
+  if (mode === "pattern") {
+    const pat = findPattern(p, patternId);
+    if (pat) return patternSteps(pat, p.timeSig);
+  }
+  return songSteps(p);
+}
+
+export function eventsAt(p: Project, mode: PlayMode, patternId: string | null, step: number): StepEvents {
+  if (mode === "pattern" && findPattern(p, patternId)) return patternEventsAtStep(p, patternId!, step);
+  return songEventsAtStep(p, step);
+}
+
+/**
+ * Where a pattern is playing at a song step, for drawing its editor's
+ * playhead in song mode. The topmost clip wins when several overlap.
+ */
+export function clipAt(p: Project, patternId: string, songStep: number): { clip: Clip; local: number } | null {
+  const pat = findPattern(p, patternId);
+  if (!pat) return null;
+  const clip = p.clips
+    .filter((c) => c.patternId === patternId && songStep >= c.start && songStep < c.start + c.length)
+    .sort((a, b) => a.track - b.track)[0];
+  return clip ? { clip, local: (songStep - clip.start) % patternSteps(pat, p.timeSig) } : null;
 }

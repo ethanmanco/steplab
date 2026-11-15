@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { demoProject } from "../src/core/project";
-import { STORAGE_KEY, debounce, loadAutosave, saveAutosave } from "../src/storage";
+import { PREFS_KEY, STORAGE_KEY, debounce, loadAutosave, loadPrefs, saveAutosave, savePrefs } from "../src/storage";
 
 function memoryStore() {
   const data = new Map<string, string>();
@@ -23,13 +23,17 @@ const throwing = {
 describe("autosave", () => {
   it("saves and loads a project", () => {
     const store = memoryStore();
-    expect(saveAutosave(store, demoProject())).toBe(true);
+    const p = demoProject();
+    expect(saveAutosave(store, p)).toBe(true);
     expect(store.data.has(STORAGE_KEY)).toBe(true);
-    expect(loadAutosave(store)).toEqual(demoProject());
+    expect(loadAutosave(store)).toEqual(p);
   });
 
-  it("returns null when nothing is saved", () => {
-    expect(loadAutosave(memoryStore())).toBeNull();
+  it("returns null when nothing is saved or the data is corrupt", () => {
+    const store = memoryStore();
+    expect(loadAutosave(store)).toBeNull();
+    store.setItem(STORAGE_KEY, "{broken");
+    expect(loadAutosave(store)).toBeNull();
   });
 
   it("survives storage that throws or is missing", () => {
@@ -38,38 +42,41 @@ describe("autosave", () => {
     expect(loadAutosave(null)).toBeNull();
     expect(saveAutosave(null, demoProject())).toBe(false);
   });
+});
 
-  it("ignores corrupt saved data", () => {
+describe("settings", () => {
+  const defaults = { metronome: false, zoom: 36 };
+
+  it("keeps only known settings of the right type", () => {
     const store = memoryStore();
-    store.setItem(STORAGE_KEY, "{broken");
-    expect(loadAutosave(store)).toBeNull();
+    store.setItem(PREFS_KEY, JSON.stringify({ metronome: true, zoom: "big", extra: 1 }));
+    expect(loadPrefs(store, defaults)).toEqual({ metronome: true, zoom: 36 });
+  });
+
+  it("round trips and survives broken storage", () => {
+    const store = memoryStore();
+    savePrefs(store, { metronome: true, zoom: 50 });
+    expect(loadPrefs(store, defaults)).toEqual({ metronome: true, zoom: 50 });
+    expect(loadPrefs(throwing, defaults)).toEqual(defaults);
+    expect(() => savePrefs(throwing, defaults)).not.toThrow();
   });
 });
 
 describe("debounce", () => {
-  it("runs once with the last arguments after a pause", () => {
+  it("runs once with the last arguments after a pause, and can flush", () => {
     vi.useFakeTimers();
     const fn = vi.fn();
     const d = debounce(fn, 300);
     d(1);
     d(2);
-    d(3);
     expect(fn).not.toHaveBeenCalled();
     vi.advanceTimersByTime(300);
-    expect(fn).toHaveBeenCalledTimes(1);
-    expect(fn).toHaveBeenCalledWith(3);
-    vi.useRealTimers();
-  });
-
-  it("can flush right away", () => {
-    vi.useFakeTimers();
-    const fn = vi.fn();
-    const d = debounce(fn, 300);
-    d(1);
-    d.flush(2);
-    vi.advanceTimersByTime(1000);
-    expect(fn).toHaveBeenCalledTimes(1);
     expect(fn).toHaveBeenCalledWith(2);
+    d(3);
+    d.flush(4);
+    vi.advanceTimersByTime(1000);
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(fn).toHaveBeenLastCalledWith(4);
     vi.useRealTimers();
   });
 });

@@ -1,82 +1,129 @@
 import { describe, expect, it } from "vitest";
-import { addNote, demoProject, emptyProject, setTrackMix, toggleDrumStep } from "../src/core/project";
-import { audibleTracks, eventsAtStep, playLength } from "../src/core/schedule";
-import type { Note } from "../src/core/types";
+import {
+  addClip,
+  addNote,
+  demoProject,
+  drumChannels,
+  emptyProject,
+  setChannelMix,
+  setDrumStep,
+  setPatternBars,
+  synthChannels,
+} from "../src/core/project";
+import {
+  audibleChannels,
+  clipAt,
+  eventsAt,
+  loopLength,
+  patternEventsAtStep,
+  playLength,
+  songEventsAtStep,
+} from "../src/core/schedule";
+import type { MelodyPattern, Note, Project } from "../src/core/types";
 
 const n = (step: number, pitch: number, length = 1, velocity = 0.8): Note => ({ step, pitch, length, velocity });
+const pat = (p: Project, name: string) => p.patterns.find((x) => x.name === name)!;
 
-describe("eventsAtStep", () => {
-  it("returns nothing for an empty project", () => {
-    expect(eventsAtStep(emptyProject(), 0)).toEqual({ drums: [], melodies: [] });
+describe("pattern mode", () => {
+  it("loops one pattern", () => {
+    const p = demoProject();
+    const beat = pat(p, "Beat").id;
+    expect(patternEventsAtStep(p, beat, 12).drums.map((d) => d.sound)).toEqual(["snare", "chat", "clap"]);
+    expect(patternEventsAtStep(p, beat, 28).drums.map((d) => d.sound)).toEqual(["snare", "chat", "clap"]);
+    expect(loopLength(p, "pattern", beat)).toBe(16);
   });
 
-  it("lists every drum that hits on a step, in row order", () => {
-    const e = eventsAtStep(demoProject(), 12);
-    expect(e.drums.map((d) => d.id)).toEqual(["snare", "chat", "clap"]);
-  });
-
-  it("skips muted rows", () => {
-    const p = setTrackMix(demoProject(), "drums", 1, { muted: true });
-    expect(eventsAtStep(p, 12).drums.map((d) => d.id)).toEqual(["chat", "clap"]);
-  });
-
-  it("reads hits far into a long loop", () => {
-    const p = toggleDrumStep({ ...emptyProject(), bars: 8 }, 5, 120);
-    expect(eventsAtStep(p, 120).drums).toEqual([{ track: 5, id: "tom" }]);
-  });
-
-  it("starts notes with their pitch, velocity and length", () => {
-    let p = addNote(emptyProject(), 1, n(3, 48, 4, 0.5));
-    p = addNote(p, 1, n(3, 55, 2));
-    expect(eventsAtStep(p, 3).melodies).toEqual([
-      {
-        track: 1,
-        synth: "bass",
-        notes: [
-          { pitch: 48, velocity: 0.5, steps: 4 },
-          { pitch: 55, velocity: 0.8, steps: 2 },
-        ],
-      },
+  it("plays a melody through its channel with pitch, velocity and length", () => {
+    const p = demoProject();
+    const hook = pat(p, "Hook") as MelodyPattern;
+    expect(patternEventsAtStep(p, hook.id, 2).notes).toEqual([
+      { channelId: hook.channelId, pitch: 67, velocity: 0.8, steps: 2 },
     ]);
-    // Held steps do not retrigger.
-    expect(eventsAtStep(p, 4).melodies).toEqual([]);
+    expect(patternEventsAtStep(p, hook.id, 3).notes).toEqual([]);
+  });
+
+  it("falls back to the song when no pattern is chosen", () => {
+    const p = demoProject();
+    expect(loopLength(p, "pattern", null)).toBe(64);
+    expect(eventsAt(p, "pattern", "missing", 0)).toEqual(songEventsAtStep(p, 0));
   });
 });
 
-describe("solo", () => {
-  it("plays only soloed tracks once any track is soloed", () => {
-    const p = setTrackMix(demoProject(), "drums", 0, { solo: true });
-    const a = audibleTracks(p);
-    expect(a.drums).toEqual([true, false, false, false, false, false]);
-    expect(a.melodies).toEqual([false, false]);
-    expect(eventsAtStep(p, 0).drums.map((d) => d.id)).toEqual(["kick"]);
+describe("song mode", () => {
+  it("plays every clip under the playhead", () => {
+    const p = demoProject();
+    const at0 = songEventsAtStep(p, 0);
+    expect(at0.drums.map((d) => d.sound)).toEqual(["kick", "chat"]);
+    expect(at0.notes.map((x) => x.pitch)).toEqual([48]);
+    // The hook only comes in on bar 3 (step 32).
+    expect(songEventsAtStep(p, 2).notes.map((x) => x.pitch)).toEqual([]);
+    expect(songEventsAtStep(p, 34).notes.map((x) => x.pitch)).toEqual([67]);
   });
 
-  it("lets mute beat solo and allows several solos", () => {
-    let p = setTrackMix(demoProject(), "drums", 0, { solo: true, muted: true });
-    p = setTrackMix(p, "melodies", 1, { solo: true });
-    const a = audibleTracks(p);
-    expect(a.drums[0]).toBe(false);
-    expect(a.melodies).toEqual([false, true]);
+  it("repeats a pattern across a long clip and cuts notes at the clip end", () => {
+    let p = emptyProject();
+    const mel = p.patterns[1]!.id;
+    p = { ...p, clips: [] };
+    p = addNote(p, mel, n(14, 60, 6));
+    p = addClip(p, mel, 0, 0, 31).project;
+    expect(songEventsAtStep(p, 14).notes[0]!.steps).toBe(6);
+    expect(songEventsAtStep(p, 30).notes[0]!.steps).toBe(1);
+  });
+
+  it("is silent past the clips and loops over whole bars", () => {
+    const p = demoProject();
+    expect(songEventsAtStep(p, 80)).toEqual({ drums: [], notes: [] });
+    expect(loopLength(p, "song", null)).toBe(64);
+  });
+
+  it("finds where a pattern plays at a song step", () => {
+    const p = demoProject();
+    const hook = pat(p, "Hook").id;
+    expect(clipAt(p, hook, 10)).toBeNull();
+    expect(clipAt(p, hook, 37)?.local).toBe(5);
+  });
+});
+
+describe("mute and solo", () => {
+  it("skips muted channels", () => {
+    let p = demoProject();
+    const snare = drumChannels(p)[1]!.id;
+    p = setChannelMix(p, snare, { muted: true });
+    expect(songEventsAtStep(p, 12).drums.map((d) => d.sound)).toEqual(["chat", "clap"]);
+  });
+
+  it("plays only soloed channels once any is soloed, and mute beats solo", () => {
+    let p = demoProject();
+    const kick = drumChannels(p)[0]!.id;
+    const bass = synthChannels(p)[1]!.id;
+    p = setChannelMix(p, kick, { solo: true });
+    p = setChannelMix(p, bass, { solo: true });
+    expect([...audibleChannels(p)].sort()).toEqual([kick, bass].sort());
+    expect(songEventsAtStep(p, 0).drums.map((d) => d.sound)).toEqual(["kick"]);
+    p = setChannelMix(p, kick, { muted: true });
+    expect(audibleChannels(p).has(kick)).toBe(false);
   });
 });
 
 describe("playLength", () => {
-  it("uses the note's own length when nothing cuts it", () => {
-    const p = addNote(emptyProject(), 0, n(0, 60, 4));
-    const m = p.melodies[0]!;
-    expect(playLength(m, m.notes[0]!, 16)).toBe(4);
+  it("stops before the same pitch starts again, across the pattern end", () => {
+    let p = emptyProject();
+    const id = p.patterns[1]!.id;
+    p = addNote(p, id, n(14, 60, 4));
+    p = addNote(p, id, n(0, 60, 1));
+    const m = p.patterns[1] as MelodyPattern;
+    expect(playLength(m, m.notes.find((x) => x.step === 14)!, 16)).toBe(2);
+    const longer = setPatternBars(p, id, 2).patterns[1] as MelodyPattern;
+    expect(playLength(longer, longer.notes.find((x) => x.step === 14)!, 32)).toBe(2);
   });
+});
 
-  it("stops before the same pitch starts again, across the loop end", () => {
-    let p = addNote(emptyProject(), 0, n(14, 60, 4));
-    p = addNote(p, 0, n(0, 60, 1));
-    const m = p.melodies[0]!;
-    const late = m.notes.find((x) => x.step === 14)!;
-    expect(playLength(m, late, 16)).toBe(2);
-    // A different pitch does not cut it.
-    const q = addNote(addNote(emptyProject(), 0, n(14, 60, 4)), 0, n(0, 62));
-    const lm = q.melodies[0]!;
-    expect(playLength(lm, lm.notes.find((x) => x.step === 14)!, 16)).toBe(4);
+describe("drum rows follow channels", () => {
+  it("plays a step only for channels that have it", () => {
+    let p = emptyProject();
+    const id = p.patterns[0]!.id;
+    const tom = drumChannels(p)[5]!.id;
+    p = setDrumStep(p, id, tom, 3, true);
+    expect(patternEventsAtStep(p, id, 3).drums).toEqual([{ channelId: tom, sound: "tom" }]);
   });
 });
