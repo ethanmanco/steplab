@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import manifestJson from "../public/samples/manifest.json";
 import { inRollRange } from "../src/core/notes";
 import { PRESETS } from "../src/core/presets";
 import { findPattern, patternSteps } from "../src/core/project";
@@ -7,11 +7,7 @@ import { songEventsAtStep } from "../src/core/schedule";
 import { parseProject, serializeProject } from "../src/core/serialize";
 import { MAX_STEPS } from "../src/core/timing";
 
-const manifest = JSON.parse(readFileSync(new URL("../public/samples/manifest.json", import.meta.url), "utf-8")) as {
-  id: string;
-  url: string;
-  root: number;
-}[];
+const manifest = manifestJson as { id: string; url: string; root: number }[];
 
 describe("preset songs", () => {
   it("have unique ids and names", () => {
