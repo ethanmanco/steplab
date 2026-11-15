@@ -60,6 +60,8 @@ export function createFileBar(actions: FileActions) {
   );
   return {
     el,
+    /** Open the file picker, for Ctrl+O. */
+    pickFile: () => input.click(),
     setHistory(canUndo: boolean, canRedo: boolean) {
       undoBtn.setAttribute("aria-disabled", String(!canUndo));
       redoBtn.setAttribute("aria-disabled", String(!canRedo));

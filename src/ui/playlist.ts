@@ -2,9 +2,9 @@ import { ROLL_HIGH, ROLL_LOW } from "../core/notes";
 import { MAX_SONG_STEPS, findChannel, findPattern, patternSteps, songSteps } from "../core/project";
 import { pulseSteps, stepsPerBar } from "../core/timing";
 import type { Clip, Pattern, Project } from "../core/types";
-import { toggle } from "./controls";
+import { segmented, toggle } from "./controls";
 import { h, setAttr } from "./dom";
-import type { AppState } from "./store";
+import type { AppState, Prefs } from "./store";
 
 export interface PlaylistActions {
   select(clipId: string | null): void;
@@ -18,6 +18,9 @@ export interface PlaylistActions {
   addTrack(): void;
   setBarWidth(px: number): void;
   setFollow(on: boolean): void;
+  setSnap(snap: Prefs["snap"]): void;
+  copy(clipId: string): void;
+  paste(): void;
 }
 
 const LANE_H = 48;
@@ -65,14 +68,26 @@ export function createPlaylist(getState: () => AppState, actions: PlaylistAction
     oninput: () => actions.setBarWidth(Number(zoom.value)),
   });
   const follow = toggle({ label: "Follow", title: "Scroll along with the playhead", onChange: actions.setFollow });
+  const snapSeg = segmented<Prefs["snap"]>({
+    legend: "Snap",
+    options: [
+      { value: "bar", label: "Bar", title: "Clips snap to bars" },
+      { value: "beat", label: "Beat", title: "Clips snap to beats" },
+      { value: "step", label: "Step", title: "Clips snap to sixteenth steps" },
+    ],
+    value: "bar",
+    onChange: actions.setSnap,
+  });
   const addTrackBtn = h("button", { type: "button", class: "btn btn-small", onclick: () => actions.addTrack() }, "Add track");
 
   // Buttons for the selected clip: the touch and screen reader way to edit.
   const sel = () => getState().selectedClip;
   const clipOf = () => getState().project.clips.find((c) => c.id === sel());
-  const unit = (fine: boolean) => {
-    const sig = getState().project.timeSig;
-    return fine ? pulseSteps(sig) : stepsPerBar(sig);
+  /** The snap size in steps. Holding Alt bypasses snapping, as in FL Studio. */
+  const unit = (noSnap = false) => {
+    const { project, prefs } = getState();
+    if (noSnap || prefs.snap === "step") return 1;
+    return prefs.snap === "beat" ? pulseSteps(project.timeSig) : stepsPerBar(project.timeSig);
   };
   const tool = (text: string, label: string, fn: (c: Clip) => void) => {
     const b = h("button", { type: "button", class: "mini tool", "aria-label": label, title: label }, text);
@@ -84,14 +99,14 @@ export function createPlaylist(getState: () => AppState, actions: PlaylistAction
   };
   const tools = [
     tool("Edit", "Edit the pattern", (c) => actions.open(c.id)),
-    tool("Copy", "Duplicate the clip (Ctrl+D)", (c) => actions.duplicate(c.id)),
+    tool("Copy", "Duplicate the clip (Ctrl+B)", (c) => actions.duplicate(c.id)),
     tool("Delete", "Delete the clip (Delete)", (c) => actions.remove(c.id)),
-    tool("◀", "Move one bar earlier (Left)", (c) => actions.move(c.id, c.track, Math.max(0, c.start - unit(false)), null)),
-    tool("▶", "Move one bar later (Right)", (c) => actions.move(c.id, c.track, c.start + unit(false), null)),
+    tool("◀", "Move earlier by the snap size (Left)", (c) => actions.move(c.id, c.track, Math.max(0, c.start - unit()), null)),
+    tool("▶", "Move later by the snap size (Right)", (c) => actions.move(c.id, c.track, c.start + unit(), null)),
     tool("▲", "Move up a track (Up)", (c) => actions.move(c.id, c.track - 1, c.start, null)),
     tool("▼", "Move down a track (Down)", (c) => actions.move(c.id, c.track + 1, c.start, null)),
-    tool("Shorter", "One bar shorter ([)", (c) => actions.resize(c.id, Math.max(unit(true), c.length - unit(false)), null)),
-    tool("Longer", "One bar longer (])", (c) => actions.resize(c.id, c.length + unit(false), null)),
+    tool("Shorter", "Shorter by the snap size ([)", (c) => actions.resize(c.id, Math.max(1, c.length - unit()), null)),
+    tool("Longer", "Longer by the snap size (])", (c) => actions.resize(c.id, c.length + unit(), null)),
   ];
   const selLabel = h("span", { class: "sel-label", "aria-live": "polite" });
   const toolbar = h("div", { class: "clip-toolbar", role: "toolbar", "aria-label": "Selected clip" }, selLabel, ...tools);
@@ -110,13 +125,14 @@ export function createPlaylist(getState: () => AppState, actions: PlaylistAction
       "div",
       { class: "panel-head" },
       h("h2", { id: "playlist-title" }, "Playlist"),
+      snapSeg.el,
       h("span", { class: "view-controls" }, h("span", { class: "field-label", "aria-hidden": "true" }, "Zoom"), zoom, follow.el),
       addTrackBtn,
     ),
     h(
       "p",
       { id: "playlist-help", class: "pl-help" },
-      "Click an empty spot to place the selected pattern. Drag clips to move them, drag their right edge to stretch them, double-click to edit, right-click to delete.",
+      "Click an empty spot to place the selected pattern. Drag clips to move them (hold Alt to skip snapping), drag their right edge to stretch them, double-click to edit, right-click to delete. Ctrl+wheel zooms.",
     ),
     toolbar,
     scroller,
@@ -252,7 +268,7 @@ export function createPlaylist(getState: () => AppState, actions: PlaylistAction
   });
   window.addEventListener("pointermove", (e) => {
     if (!drag) return;
-    const u = unit(e.shiftKey);
+    const u = unit(e.altKey);
     const dx = (e.clientX - drag.x) / geo.stepW;
     if (!drag.moved && Math.abs(e.clientX - drag.x) < 4 && Math.abs(e.clientY - drag.y) < 4) return;
     drag.moved = true;
@@ -304,7 +320,7 @@ export function createPlaylist(getState: () => AppState, actions: PlaylistAction
     const area = target.closest<HTMLElement>(".pl-area");
     if (!area) return;
     const x = e.clientX - area.getBoundingClientRect().left;
-    const u = unit(e.shiftKey);
+    const u = unit(e.altKey);
     actions.placeAt(Number(area.dataset.track), Math.max(0, Math.floor(x / geo.stepW / u) * u));
   });
 
@@ -313,17 +329,24 @@ export function createPlaylist(getState: () => AppState, actions: PlaylistAction
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>(".clip");
     const c = getState().project.clips.find((x) => x.id === b?.dataset.id);
     if (!b || !c) return;
+    // Shift moves by single steps from the keyboard.
     const u = unit(e.shiftKey);
     const mod = e.ctrlKey || e.metaKey;
+    const k = e.key.toLowerCase();
     let handled = true;
     if (e.key === "Enter") actions.open(c.id);
     else if (e.key === "Delete" || e.key === "Backspace") actions.remove(c.id);
-    else if (mod && e.key.toLowerCase() === "d") actions.duplicate(c.id);
+    else if (mod && k === "b") actions.duplicate(c.id);
+    else if (mod && k === "d") {
+      actions.select(null);
+      b.blur();
+    } else if (mod && k === "c") actions.copy(c.id);
+    else if (mod && k === "v") actions.paste();
     else if (e.key === "ArrowLeft") actions.move(c.id, c.track, Math.max(0, c.start - u), null);
     else if (e.key === "ArrowRight") actions.move(c.id, c.track, c.start + u, null);
     else if (e.key === "ArrowUp") actions.move(c.id, c.track - 1, c.start, null);
     else if (e.key === "ArrowDown") actions.move(c.id, c.track + 1, c.start, null);
-    else if (e.key === "[") actions.resize(c.id, Math.max(u, c.length - u), null);
+    else if (e.key === "[") actions.resize(c.id, Math.max(1, c.length - u), null);
     else if (e.key === "]") actions.resize(c.id, c.length + u, null);
     else handled = false;
     if (handled) {
@@ -342,16 +365,37 @@ export function createPlaylist(getState: () => AppState, actions: PlaylistAction
     actions.seek(Math.floor(x / geo.stepW / geo.bar) * geo.bar);
   });
 
+  // Ctrl + mouse wheel zooms the playlist sideways, as in FL Studio.
+  scroller.addEventListener(
+    "wheel",
+    (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const next = Math.min(240, Math.max(32, getState().prefs.barWidth * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+      actions.setBarWidth(Math.round(next));
+    },
+    { passive: false },
+  );
+
   let lastStep = -1;
   return {
     el,
     scroller,
+    /** F5: put focus on the selected clip, or the first one. */
+    focus() {
+      const sel = clipEls.get(getState().selectedClip ?? "") ?? clipEls.values().next().value;
+      if (sel) sel.focus();
+      else addTrackBtn.focus();
+      el.scrollIntoView({ block: "nearest" });
+    },
     update(s: AppState) {
       const p = s.project;
       rebuildLanes(p, s);
       renderClips(s);
       if (zoom.value !== String(s.prefs.barWidth)) zoom.value = String(s.prefs.barWidth);
       follow.set(s.prefs.follow);
+      snapSeg.setValue(s.prefs.snap);
+      scroller.dataset.layout = s.prefs.layout;
       const c = p.clips.find((x) => x.id === s.selectedClip);
       const pat = c && findPattern(p, c.patternId);
       selLabel.textContent = c && pat ? clipLabel(c, pat) : "No clip selected";

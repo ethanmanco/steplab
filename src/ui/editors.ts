@@ -139,6 +139,12 @@ export function createDrumEditor(getState: () => AppState, actions: DrumEditorAc
           set(row, col, paintValue, paintGroup);
         },
         paintMove: (row, col) => set(row, col, paintValue, paintGroup),
+        erase: (row, col) => {
+          if (isOn(row, col)) set(row, col, false, `erase-${paintCount}`);
+        },
+        paintEnd: () => {
+          paintCount += 1;
+        },
       },
     });
     if (grid) grid.scroller.replaceWith(next.scroller);
@@ -346,6 +352,13 @@ export function createRollEditor(getState: () => AppState, actions: RollEditorAc
       nudge(row, col, dir) {
         const pat = pattern();
         if (pat) actions.nudgeNote(pat.id, col, pitchOf(row), dir);
+      },
+      erase(row, col) {
+        const pat = pattern();
+        if (pat && noteAt(pat, col, pitchOf(row))) actions.removeNote(pat.id, col, pitchOf(row), `erase-${groupCount}`);
+      },
+      paintEnd() {
+        groupCount += 1;
       },
     },
   });

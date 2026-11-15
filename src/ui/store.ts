@@ -20,6 +20,12 @@ export interface Prefs {
   barWidth: number;
   /** Scroll along with the playhead. */
   follow: boolean;
+  /** Auto sizes panels and windows to fit; Manual lets you drag their sizes. */
+  layout: "auto" | "manual";
+  /** Sidebar width in Manual layout, in pixels. */
+  sidebarWidth: number;
+  /** What clips snap to in the playlist. Alt bypasses it, like FL Studio. */
+  snap: "bar" | "beat" | "step";
 }
 
 export interface AppState {

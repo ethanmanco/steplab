@@ -46,12 +46,14 @@ import {
 import { recordedNote } from "./core/record";
 import { clipAt } from "./core/schedule";
 import { parseProject, serializeProject } from "./core/serialize";
-import type { Channel, DrumId, MelodyPattern, Project, SynthId } from "./core/types";
+import { DRUMS_808, type Channel, type DrumId, type MelodyPattern, type Project, type SynthId } from "./core/types";
 import { connectMidi } from "./midi";
 import { debounce, getStorage, loadAutosave, loadPrefs, saveAutosave, savePrefs } from "./storage";
 import { h } from "./ui/dom";
 import { createDrumEditor, createRollEditor } from "./ui/editors";
-import { createFileBar, createToast, dateStamp, downloadBlob } from "./ui/fileBar";
+import { createFileBar, createToast, dateStamp, downloadBlob, type FileActions } from "./ui/fileBar";
+import { segmented } from "./ui/controls";
+import { createShortcutsWindow } from "./ui/shortcuts";
 import { createPlaylist } from "./ui/playlist";
 import { createSidebar } from "./ui/sidebar";
 import { paintStarfield } from "./ui/space";
@@ -69,7 +71,19 @@ const DEFAULT_PREFS: Prefs = {
   zoom: 36,
   barWidth: 96,
   follow: true,
+  layout: "auto",
+  sidebarWidth: 320,
+  snap: "bar",
 };
+/** Settings come from storage, so make sure the choice-type ones hold a real choice. */
+function cleanPrefs(p: Prefs): Prefs {
+  return {
+    ...p,
+    layout: p.layout === "manual" ? "manual" : "auto",
+    snap: ["bar", "beat", "step"].includes(p.snap) ? p.snap : "bar",
+    sidebarWidth: Math.min(640, Math.max(240, p.sidebarWidth || 320)),
+  };
+}
 const initialProject = loadAutosave(storage) ?? demoProject();
 let history: History<Project> = createHistory(initialProject);
 
@@ -83,7 +97,7 @@ const store = createStore({
   openRoll: null,
   selectedClip: null,
   drawLength: 2,
-  prefs: loadPrefs(storage, DEFAULT_PREFS),
+  prefs: cleanPrefs(loadPrefs(storage, DEFAULT_PREFS)),
   canUndo: false,
   canRedo: false,
 });
@@ -267,6 +281,16 @@ const sidebar = createSidebar({
     if (name !== null) edit((p) => renameChannel(p, id, name));
   },
   setChannelSound: (id, sound) => edit((p) => setChannelSound(p, id, sound)),
+  addKit808() {
+    const have = new Set(project().channels.filter((c) => c.kind === "drum").map((c) => c.sound));
+    const missing = DRUMS_808.filter((d) => !have.has(d));
+    if (!missing.length) {
+      toast.show("This song already has every 808 kit sound.");
+      return;
+    }
+    edit((p) => missing.reduce((acc, d) => addChannel(acc, drumChannel(d)), p));
+    toast.show(`Added ${missing.length} 808 sound${missing.length === 1 ? "" : "s"} to the channel rack.`);
+  },
   newDrums() {
     const { project: withPattern, id } = addDrumPattern(project());
     addAndPlace(withPattern, id, { openDrums: id });
@@ -325,7 +349,24 @@ const playlist = createPlaylist(() => store.get(), {
   addTrack: () => edit(addTrack),
   setBarWidth: (barWidth) => setPrefs({ barWidth }),
   setFollow: (follow) => setPrefs({ follow }),
+  setSnap: (snap) => setPrefs({ snap }),
+  copy(id) {
+    const clip = project().clips.find((c) => c.id === id);
+    if (!clip) return;
+    clipboard = { patternId: clip.patternId, length: clip.length, track: clip.track };
+    toast.show("Clip copied. Ctrl+V pastes it after the selected clip.");
+  },
+  paste() {
+    const p = project();
+    if (!clipboard || !findPattern(p, clipboard.patternId)) return;
+    const sel = p.clips.find((c) => c.id === store.get().selectedClip);
+    const track = sel?.track ?? clipboard.track;
+    const start = sel ? sel.start + sel.length : songSteps(p);
+    const { project: next, id } = addClip(p, clipboard.patternId, track, start, clipboard.length);
+    if (id) edit(() => next, null, undefined, { selectedClip: id });
+  },
 });
+let clipboard: { patternId: string; length: number; track: number } | null = null;
 
 /* ---------- Editor windows ---------- */
 
@@ -445,7 +486,7 @@ function onMidi(e: MidiEvent) {
 
 /* ---------- Project files ---------- */
 
-const files = createFileBar({
+const fileActions: FileActions = {
   undo: doUndo,
   redo: doRedo,
   newProject() {
@@ -497,7 +538,8 @@ const files = createFileBar({
       toast.show("The WAV export failed in this browser.", "error");
     }
   },
-});
+};
+const files = createFileBar(fileActions);
 
 /* ---------- Playheads ---------- */
 
@@ -522,35 +564,103 @@ engine.setStepListener((step) => {
 
 /* ---------- Page ---------- */
 
+const helpWin = createShortcutsWindow(() => helpWin.hide());
+function openHelp() {
+  helpWin.show();
+}
+
+// Auto sizes panels and windows to fit; Manual lets you drag their sizes.
+const layoutSeg = segmented<Prefs["layout"]>({
+  legend: "Layout",
+  options: [
+    { value: "auto", label: "Auto", title: "Panels and editor windows size themselves to fit" },
+    { value: "manual", label: "Manual", title: "Drag the divider and window corners to size them yourself" },
+  ],
+  value: "auto",
+  onChange: (layout) => setPrefs({ layout }),
+  className: "seg-layout",
+});
+const helpBtn = h(
+  "button",
+  { type: "button", class: "btn btn-small", title: "Keyboard shortcuts (F1)", "aria-keyshortcuts": "F1", onclick: openHelp },
+  "Shortcuts",
+);
+
+// The divider between the sidebar and the playlist. Dragging it switches to
+// Manual layout; double-clicking it goes back to Auto.
+const splitter = h("div", {
+  class: "splitter",
+  role: "separator",
+  tabindex: 0,
+  "aria-orientation": "vertical",
+  "aria-label": "Sidebar width. Arrow keys resize, Enter returns to automatic size.",
+  "aria-valuemin": 240,
+  "aria-valuemax": 640,
+  title: "Drag to resize. Double-click for automatic size.",
+});
+const workspace = h(
+  "main",
+  { class: "workspace" },
+  h("h1", { class: "sr-only" }, "Steplab beat maker"),
+  sidebar.el,
+  splitter,
+  playlist.el,
+);
+let splitDrag = false;
+splitter.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  splitDrag = true;
+  splitter.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+splitter.addEventListener("pointermove", (e) => {
+  if (!splitDrag) return;
+  const left = workspace.getBoundingClientRect().left;
+  const width = Math.round(Math.min(640, Math.max(240, e.clientX - left - 8)));
+  store.set((s) => ({ prefs: { ...s.prefs, layout: "manual", sidebarWidth: width } }));
+});
+splitter.addEventListener("pointerup", () => {
+  if (!splitDrag) return;
+  splitDrag = false;
+  savePrefs(storage, store.get().prefs);
+});
+splitter.addEventListener("dblclick", () => setPrefs({ layout: "auto" }));
+splitter.addEventListener("keydown", (e) => {
+  const w = store.get().prefs.sidebarWidth;
+  if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+    e.preventDefault();
+    const sidebarWidth = Math.min(640, Math.max(240, w + (e.key === "ArrowRight" ? 16 : -16)));
+    setPrefs({ layout: "manual", sidebarWidth });
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    setPrefs({ layout: "auto" });
+  }
+});
+
 const app = document.getElementById("app")!;
 app.append(
   h(
     "header",
     { class: "top" },
-    h("div", { class: "brand" }, h("span", { class: "logo", "aria-hidden": "true" }, "Steplab"), files.el),
+    h(
+      "div",
+      { class: "brand" },
+      h("span", { class: "logo", "aria-hidden": "true" }, "Steplab"),
+      h("span", { class: "brand-tools" }, layoutSeg.el, helpBtn),
+      files.el,
+    ),
     transport.el,
   ),
-  h(
-    "main",
-    { class: "workspace" },
-    h("h1", { class: "sr-only" }, "Steplab beat maker"),
-    sidebar.el,
-    playlist.el,
-  ),
+  workspace,
   h(
     "footer",
     { class: "foot" },
-    h("p", {}, h("kbd", {}, "P"), " or ", h("kbd", {}, "Space"), " play or pause"),
-    h("p", {}, h("kbd", {}, "Esc"), " stop"),
-    h("p", {}, h("kbd", {}, "Shift"), "+", h("kbd", {}, "R"), " record"),
-    h("p", {}, h("kbd", {}, "Z"), " to ", h("kbd", {}, "M"), " and ", h("kbd", {}, "Q"), " to ", h("kbd", {}, "U"), " play notes"),
-    h("p", {}, "On a clip: arrows move, ", h("kbd", {}, "["), " ", h("kbd", {}, "]"), " length, ", h("kbd", {}, "Enter"), " edit, ", h("kbd", {}, "Delete")),
-    h("p", {}, h("kbd", {}, "Ctrl"), "+", h("kbd", {}, "Z"), " undo"),
+    h("p", {}, "FL Studio shortcuts work here: ", h("kbd", {}, "Space"), " play, ", h("kbd", {}, "R"), " record, ", h("kbd", {}, "L"), " pattern or song, ", h("kbd", {}, "Alt"), " + drag to skip snapping. Press ", h("kbd", {}, "F1"), " for the full list."),
     h("p", { class: "foot-save" }, "Your song autosaves in this browser."),
   ),
   toast.el,
 );
-document.body.append(drumEditor.win.el, rollEditor.win.el);
+document.body.append(drumEditor.win.el, rollEditor.win.el, helpWin.el);
 paintStarfield();
 
 function render() {
@@ -561,8 +671,19 @@ function render() {
   drumEditor.update(s);
   rollEditor.update(s);
   files.setHistory(s.canUndo, s.canRedo);
+  layoutSeg.setValue(s.prefs.layout);
+  workspace.dataset.layout = s.prefs.layout;
+  workspace.style.setProperty("--side-w", `${s.prefs.sidebarWidth}px`);
+  splitter.setAttribute("aria-valuenow", String(s.prefs.sidebarWidth));
+  for (const w of [drumEditor.win, rollEditor.win, helpWin]) {
+    w.setLayout(s.prefs.layout);
+    w.fit();
+  }
   document.documentElement.style.setProperty("--step-w", `${s.prefs.zoom}px`);
 }
+window.addEventListener("resize", () => {
+  for (const w of [drumEditor.win, rollEditor.win, helpWin]) w.fit();
+});
 
 // Autosave: quietly after each pause in editing, and right away when the tab is hidden.
 let autosaveWarned = false;
@@ -588,7 +709,7 @@ store.subscribe((s, prev) => {
 });
 render();
 
-/* ---------- Keyboard ---------- */
+/* ---------- Keyboard: FL Studio shortcuts ---------- */
 
 function isTyping(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -599,45 +720,116 @@ function isTyping(target: EventTarget | null): boolean {
 
 /** Space plays only when it would not press a focused control. */
 function spaceIsFree(target: EventTarget | null): boolean {
-  return !(target instanceof HTMLElement) || !target.closest("button, input, select, label, a, [role=tab]");
+  return !(target instanceof HTMLElement) || !target.closest("button, input, select, label, a, [role=tab], [role=separator]");
+}
+
+/** Space in FL Studio: start, or stop and go back to the start. */
+function playStop() {
+  if (running()) stop();
+  else togglePlay();
+}
+
+function toggleMode() {
+  const mode = store.get().mode === "song" ? "pattern" : "song";
+  store.set({ mode });
+  toast.show(mode === "song" ? "Song mode: playing the playlist." : "Pattern mode: looping the selected pattern.");
+}
+
+/** Numpad + and -: step through the pattern list. */
+function cyclePattern(dir: 1 | -1) {
+  const { patterns } = project();
+  if (!patterns.length) return;
+  const i = patterns.findIndex((x) => x.id === store.get().current);
+  const next = patterns[(i + dir + patterns.length) % patterns.length]!;
+  store.set({ current: next.id });
+  toast.show(`Pattern: ${next.name}`);
+}
+
+/** F7: the piano roll for the melody being worked on, or the first melody. */
+function openPianoRoll() {
+  const target = recordTarget() ?? project().patterns.find((x) => x.kind === "melody");
+  if (target) openPattern(target.id);
+  else toast.show("There is no melody yet. Press New melody to make one.");
 }
 
 document.addEventListener("keydown", (e) => {
-  if (app.inert || isTyping(e.target)) return;
+  if (app.inert) return;
   const mod = e.ctrlKey || e.metaKey;
-  if (mod && !e.altKey) {
-    const k = e.key.toLowerCase();
-    if (k === "z") {
-      e.preventDefault();
-      if (e.shiftKey) doRedo();
-      else doUndo();
-    } else if (k === "y") {
-      e.preventDefault();
-      doRedo();
-    }
+  const k = e.key.toLowerCase();
+
+  // Window keys and file shortcuts work from anywhere, even a text box.
+  const fkeys: Record<string, () => void> = {
+    F1: openHelp,
+    F5: () => playlist.focus(),
+    F6: () => sidebar.focusRack(),
+    F7: openPianoRoll,
+  };
+  if (fkeys[e.key] && !mod && !e.altKey) {
+    e.preventDefault();
+    fkeys[e.key]!();
     return;
   }
-  if (e.altKey) return;
-  if (e.code === "KeyR" && e.shiftKey) {
+  if (mod && !e.altKey && !e.shiftKey && (k === "s" || k === "o" || k === "r")) {
     e.preventDefault();
-    if (!e.repeat) toggleRecord();
+    if (k === "s") fileActions.saveFile();
+    else if (k === "o") files.pickFile();
+    else void fileActions.exportWav?.();
+    return;
+  }
+
+  if (isTyping(e.target)) return;
+  if (mod && k === "z") {
+    e.preventDefault();
+    if (e.shiftKey) doRedo();
+    else doUndo();
+    return;
+  }
+  if (mod && k === "y") {
+    e.preventDefault();
+    doRedo();
+    return;
+  }
+  if (mod && e.code === "Space") {
+    e.preventDefault();
+    if (!e.repeat) togglePlay();
+    return;
+  }
+  if (mod || e.altKey) return;
+
+  if (e.key === " " && spaceIsFree(e.target)) {
+    e.preventDefault();
+    if (!e.repeat) playStop();
     return;
   }
   if (e.key === "Escape") {
     stop();
     return;
   }
-  if ((e.key === "p" || e.key === "P") && !e.shiftKey) {
-    e.preventDefault();
-    if (!e.repeat) togglePlay();
-    return;
-  }
-  if (e.key === " " && spaceIsFree(e.target)) {
-    e.preventDefault();
-    if (!e.repeat) togglePlay();
-    return;
-  }
   const { prefs } = store.get();
+  if (e.code === "KeyR" && (e.shiftKey || !prefs.keys)) {
+    e.preventDefault();
+    if (!e.repeat) toggleRecord();
+    return;
+  }
+  if (e.code === "KeyL" && !e.shiftKey) {
+    e.preventDefault();
+    if (!e.repeat) toggleMode();
+    return;
+  }
+  if (e.code === "NumpadAdd" || e.code === "NumpadSubtract") {
+    e.preventDefault();
+    cyclePattern(e.code === "NumpadAdd" ? 1 : -1);
+    return;
+  }
+  if (e.key === "?") {
+    openHelp();
+    return;
+  }
+  if (e.code === "KeyP" && !e.shiftKey) {
+    e.preventDefault();
+    if (!e.repeat) togglePlay();
+    return;
+  }
   if (!prefs.keys || e.shiftKey) return;
   if (e.code === "Minus" || e.code === "Equal") {
     e.preventDefault();

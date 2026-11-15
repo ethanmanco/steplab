@@ -716,6 +716,15 @@ input[type="range"] {
 [data-sound="ohat"] { --c: var(--c-ohat); }
 [data-sound="clap"] { --c: var(--c-clap); }
 [data-sound="tom"] { --c: var(--c-tom); }
+[data-sound="kick808"] { --c: var(--c-kick); }
+[data-sound="snare808"] { --c: var(--c-snare); }
+[data-sound="hat808"] { --c: var(--c-chat); }
+[data-sound="ohat808"] { --c: var(--c-ohat); }
+[data-sound="clap808"] { --c: var(--c-clap); }
+[data-sound="tom808"] { --c: var(--c-tom); }
+[data-sound="rim"] { --c: #c9d2e6; }
+[data-sound="cowbell"] { --c: #e8cf5a; }
+[data-sound="b808"] { --c: #ff7e4a; }
 [data-sound="lead"] { --c: var(--c-m1); }
 [data-sound="bass"] { --c: var(--c-m2); }
 [data-sound="pluck"] { --c: var(--c-pluck); }
@@ -724,22 +733,78 @@ input[type="range"] {
 
 /* ---------- Workspace: channels and patterns beside the playlist ---------- */
 
+/* Auto: the sidebar takes a share of the screen that always fits its
+   controls. Manual: it keeps the width you dragged the divider to. */
 .workspace {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: clamp(300px, 24vw, 400px) 10px minmax(0, 1fr);
+  gap: 6px;
   align-items: start;
   padding-top: 16px;
 }
 
+.workspace[data-layout="manual"] {
+  grid-template-columns: var(--side-w, 320px) 10px minmax(0, 1fr);
+}
+
+/* Nothing in the sidebar is cut off: it grows as tall as its content and
+   every row shrinks to its width. */
 .sidebar {
   display: grid;
   gap: 16px;
-  position: sticky;
-  top: 130px;
-  max-height: calc(100vh - 146px);
-  overflow-y: auto;
-  scrollbar-width: thin;
+  min-width: 0;
+}
+
+.sidebar > *,
+.channel,
+.channel-top,
+.channel .track-mix,
+.pattern {
+  min-width: 0;
+}
+
+.channel-top .select-small {
+  max-width: 48%;
+}
+
+.splitter {
+  align-self: stretch;
+  position: relative;
+  min-height: 200px;
+  border-radius: 5px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.splitter::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: rgba(160, 170, 255, 0.18);
+  transition: background-color 120ms ease;
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after {
+  background: var(--focus);
+}
+
+.workspace[data-layout="manual"] .splitter::after {
+  background: rgba(160, 170, 255, 0.4);
+}
+
+.brand-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.seg-layout .seg-opt span {
+  min-width: 58px;
 }
 
 .side-panel {
@@ -925,15 +990,20 @@ input[type="range"] {
   color: var(--ink-soft);
 }
 
+/* Auto: the playlist is as tall as its tracks. Manual: drag its bottom edge. */
 .pl-scroller {
   position: relative;
   overflow: auto;
-  max-height: calc(100vh - 260px);
-  min-height: 300px;
+  min-height: 160px;
   margin: 0 8px;
   border-radius: 10px;
   scrollbar-width: thin;
   scrollbar-color: rgba(200, 206, 255, 0.3) transparent;
+}
+
+.pl-scroller[data-layout="manual"] {
+  height: calc(100vh - 280px);
+  resize: vertical;
 }
 
 .pl-canvas {
@@ -1065,12 +1135,9 @@ input[type="range"] {
   z-index: 40;
   display: flex;
   flex-direction: column;
-  width: min(1100px, calc(100vw - 48px));
-  height: min(560px, calc(100vh - 140px));
   min-width: 320px;
-  min-height: 220px;
+  min-height: 180px;
   overflow: hidden;
-  resize: both;
   background: var(--panel-solid);
   border: 1px solid color-mix(in srgb, var(--c, #9db8ff) 55%, transparent);
   border-radius: 14px;
@@ -1079,8 +1146,76 @@ input[type="range"] {
     0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 
+/* Auto: the window shrink-wraps what it shows, never bigger than the screen. */
+.win[data-layout="auto"],
+.win:not([data-layout]) {
+  width: max-content;
+  height: auto;
+  max-width: calc(100vw - 32px);
+  /* Leave some of the playlist in view behind a tall piano roll. */
+  max-height: min(calc(100vh - 32px), 78vh);
+  resize: none;
+}
+
+/* Manual: a sensible starting size, then drag the corner. */
+.win[data-layout="manual"] {
+  width: min(1100px, calc(100vw - 48px));
+  height: min(560px, calc(100vh - 140px));
+  max-width: 100vw;
+  max-height: 100vh;
+  resize: both;
+}
+
 .win-drums {
   --c: var(--c-drums);
+}
+
+.win-help {
+  --c: var(--focus);
+}
+
+.help-body {
+  overflow: auto;
+  padding: 0 18px 16px;
+  columns: 2 300px;
+  column-gap: 32px;
+}
+
+.help-lede {
+  margin: 0 0 12px;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  column-span: all;
+}
+
+.help-group {
+  break-inside: avoid;
+  margin-bottom: 14px;
+}
+
+.help-group h3 {
+  margin: 0 0 6px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.help-group dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.help-group dt {
+  white-space: nowrap;
+}
+
+.help-group dd {
+  margin: 0;
 }
 
 .win-bar {
@@ -1114,7 +1249,7 @@ input[type="range"] {
 }
 
 .win-body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -1122,7 +1257,7 @@ input[type="range"] {
 }
 
 .win-body > .scroller {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
 }
@@ -1425,13 +1560,12 @@ kbd {
 /* ---------- Narrower screens: the sidebar moves above the playlist ---------- */
 
 @media (max-width: 900px) {
-  .workspace {
+  .workspace,
+  .workspace[data-layout="manual"] {
     grid-template-columns: minmax(0, 1fr);
   }
-  .sidebar {
-    position: static;
-    max-height: none;
-    overflow: visible;
+  .splitter {
+    display: none;
   }
 }
 
@@ -1467,10 +1601,13 @@ kbd {
     width: var(--key-w);
   }
   /* Editor windows fill the screen on phones. */
-  .win {
+  .win,
+  .win[data-layout] {
     inset: 0 !important;
-    width: 100vw;
-    height: 100dvh;
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: none;
+    max-height: none;
     border-radius: 0;
     resize: none;
   }

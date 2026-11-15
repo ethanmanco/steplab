@@ -14,6 +14,7 @@ export interface SidebarActions {
   setMute(id: string, muted: boolean): void;
   setSolo(id: string, solo: boolean): void;
   setVolume(id: string, volume: number): void;
+  addKit808(): void;
   newDrums(): void;
   newMelody(): void;
   selectPattern(id: string): void;
@@ -95,7 +96,13 @@ export function createSidebar(actions: SidebarActions) {
     { class: "panel side-panel", "aria-labelledby": "rack-title" },
     h("div", { class: "panel-head" }, h("h2", { id: "rack-title" }, "Channels")),
     list,
-    h("div", { class: "side-add" }, addSelect, addBtn),
+    h(
+      "div",
+      { class: "side-add" },
+      addSelect,
+      addBtn,
+      h("button", { type: "button", class: "btn btn-small", title: "Add any 808 kit sounds this song does not have yet", onclick: () => actions.addKit808() }, "Add 808 kit"),
+    ),
   );
 
   /* ---------- Pattern list ---------- */
@@ -167,6 +174,11 @@ export function createSidebar(actions: SidebarActions) {
 
   return {
     el: h("div", { class: "sidebar" }, patterns, rack),
+    /** F6: put focus in the channel rack. */
+    focusRack() {
+      (list.querySelector(".channel-name") as HTMLElement | null)?.focus();
+      rack.scrollIntoView({ block: "nearest" });
+    },
     update(s: AppState) {
       const p = s.project;
       const audible = audibleChannels(p);

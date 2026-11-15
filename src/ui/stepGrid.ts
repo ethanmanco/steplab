@@ -22,6 +22,8 @@ export interface GridHandlers {
   paintStart?(row: number, col: number): void;
   paintMove?(row: number, col: number): void;
   paintEnd?(): void;
+  /** Right mouse button, like FL Studio: remove what is under the pointer, and keep removing while dragging. */
+  erase?(row: number, col: number): void;
   /** Shift with Left or Right, for changing a note's length. */
   nudge?(row: number, col: number, dir: 1 | -1): void;
 }
@@ -127,17 +129,32 @@ export function createStepGrid(opts: {
   // Mouse and pen paint by dragging. Touch keeps native scrolling and
   // toggles on tap through the click event instead.
   let painting = false;
+  let erasing = false;
   let lastPointer = "mouse";
   let lastKey = "";
+  el.addEventListener("contextmenu", (e) => {
+    if (handlers.erase && cellFrom(e.target)) e.preventDefault();
+  });
   el.addEventListener("pointerdown", (e) => {
     lastPointer = e.pointerType;
-    if (e.pointerType === "touch" || e.button !== 0 || !handlers.paintStart) return;
+    if (e.pointerType === "touch") return;
     const b = cellFrom(e.target);
     if (!b) return;
-    e.preventDefault();
     const p = pos(b);
+    if (e.button === 2 && handlers.erase) {
+      e.preventDefault();
+      setFocus(p.row, p.col, true);
+      painting = true;
+      erasing = true;
+      lastKey = `${p.row}:${p.col}`;
+      handlers.erase(p.row, p.col);
+      return;
+    }
+    if (e.button !== 0 || !handlers.paintStart) return;
+    e.preventDefault();
     setFocus(p.row, p.col, true);
     painting = true;
+    erasing = false;
     lastKey = `${p.row}:${p.col}`;
     handlers.paintStart(p.row, p.col);
   });
@@ -149,7 +166,8 @@ export function createStepGrid(opts: {
     const key = `${p.row}:${p.col}`;
     if (key === lastKey) return;
     lastKey = key;
-    handlers.paintMove?.(p.row, p.col);
+    if (erasing) handlers.erase?.(p.row, p.col);
+    else handlers.paintMove?.(p.row, p.col);
   });
   const endPaint = () => {
     if (!painting) return;
