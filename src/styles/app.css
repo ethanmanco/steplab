@@ -1693,3 +1693,181 @@ kbd {
     animation: none !important;
   }
 }
+
+/* ---------- Sliders ---------- */
+
+.slider {
+  display: grid;
+  grid-template-columns: 5.5em minmax(70px, 1fr) 4.5em;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.slider-label {
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.slider-out {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.slider input[type="range"] {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ---------- Channel settings window ---------- */
+
+.win-channel .win-body {
+  overflow: auto;
+}
+
+.settings-body {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 14px;
+}
+
+.settings-group {
+  margin: 0 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.settings-group h3 {
+  margin: 0 0 6px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.settings-group .editor-controls {
+  padding: 6px 0 0;
+}
+
+.settings-group > .hear-note {
+  margin: 0;
+}
+
+.sample-select {
+  max-width: 18em;
+}
+
+.knob-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px 22px;
+}
+
+/* ---------- Mixer window ---------- */
+
+.mixer-body {
+  display: flex;
+  gap: 10px;
+  min-height: 0;
+  padding: 0 12px 12px;
+  overflow: auto;
+}
+
+.mixer-strips {
+  display: flex;
+  gap: 8px;
+}
+
+.strip {
+  flex: 0 0 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--edge);
+  border-top: 3px solid var(--c, var(--ink-soft));
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.strip.silent {
+  opacity: 0.55;
+}
+
+.strip-master {
+  --c: var(--ink);
+  flex-basis: 190px;
+  position: sticky;
+  right: 0;
+  background: var(--panel-solid);
+}
+
+.strip-name {
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.strip-name:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.strip-group {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--edge);
+}
+
+.strip .slider {
+  grid-template-columns: 3.4em minmax(40px, 1fr) 3.4em;
+  gap: 4px;
+  font-size: 0.7rem;
+}
+
+.strip .slider-label {
+  font-size: 0.62rem;
+}
+
+.strip .slider-out {
+  font-size: 0.66rem;
+}
+
+/* The fader stands upright, like a mixing desk. */
+.slider-v {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.slider-v input.vertical {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 28px;
+  height: 130px;
+}
+
+.strip-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.win-mixer[data-layout="auto"] {
+  max-width: min(calc(100vw - 32px), 1200px);
+}

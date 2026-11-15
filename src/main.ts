@@ -8,6 +8,14 @@ import {
   DEFAULT_VELOCITY,
   addChannel,
   addClip,
+  addSample,
+  makeId,
+  resetChannelSound,
+  setChannelFx,
+  setChannelPan,
+  setChannelSample,
+  setChannelTone,
+  setMaster,
   addDrumPattern,
   addMelodyPattern,
   addNote,
@@ -55,6 +63,9 @@ import { createDrumEditor, createRollEditor } from "./ui/editors";
 import { createFileBar, createToast, dateStamp, downloadBlob, type FileActions } from "./ui/fileBar";
 import { segmented } from "./ui/controls";
 import { createShortcutsWindow } from "./ui/shortcuts";
+import { createChannelSettings, type LibrarySample } from "./ui/channelSettings";
+import { createMixer } from "./ui/mixer";
+import { createSampleBank } from "./samples";
 import { createPlaylist } from "./ui/playlist";
 import { createSidebar } from "./ui/sidebar";
 import { paintStarfield } from "./ui/space";
@@ -103,12 +114,30 @@ const store = createStore({
   openDrums: null,
   openRoll: null,
   selectedClip: null,
+  openChannel: null,
+  mixerOpen: false,
+  sampleStatus: {},
   drawLength: 2,
   prefs: cleanPrefs(loadPrefs(storage, DEFAULT_PREFS)),
   canUndo: false,
   canRedo: false,
 });
-const engine = new Engine(initialProject);
+// Sample audio: decoded once, shared by playback and export. When a file
+// finishes loading, the engine rebuilds that channel's voice.
+const bank = createSampleBank(() => {
+  engine.setProject(project());
+  store.set((s) => ({ sampleStatus: sampleStatusFor(s.project) }));
+});
+function sampleStatusFor(p: Project): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const x of p.samples) {
+    if (bank.failed(x.id)) out[x.id] = `${x.name} could not be loaded. Load the file again.`;
+    else if (!bank.get(x.id)) out[x.id] = `Loading ${x.name}...`;
+  }
+  return out;
+}
+const engine = new Engine(initialProject, (id) => bank.get(id));
+bank.ensure(initialProject.samples);
 engine.metronome = store.get().prefs.metronome;
 engine.setSource("song", store.get().current);
 const toast = createToast();
@@ -124,6 +153,7 @@ function tidy(p: Project, s: AppState): Partial<AppState> {
     openDrums: has(s.openDrums) ? s.openDrums : null,
     openRoll: has(s.openRoll) ? s.openRoll : null,
     selectedClip: p.clips.some((c) => c.id === s.selectedClip) ? s.selectedClip : null,
+    openChannel: p.channels.some((c) => c.id === s.openChannel) ? s.openChannel : null,
     backing: s.backing && s.backing.filter((id) => has(id)),
   };
 }
@@ -299,6 +329,22 @@ const sidebar = createSidebar({
     if (name !== null) edit((p) => renameChannel(p, id, name));
   },
   setChannelSound: (id, sound) => edit((p) => setChannelSound(p, id, sound)),
+  addSampleChannel(kind) {
+    pickAudio(async (file) => {
+      const sampleId = makeId("s");
+      try {
+        await bank.importFile(file, sampleId);
+      } catch (err) {
+        toast.show(err instanceof Error ? err.message : "That file could not be loaded.", "error");
+        return;
+      }
+      const name = file.name.replace(/\.[^.]+$/, "").slice(0, 40) || "Sample";
+      const ch: Channel = kind === "drum" ? drumChannel("kick808", name) : synthChannel("piano", name);
+      edit((p) => setChannelSample(addChannel(addSample(p, { id: sampleId, name, source: "user", root: 60 }), ch), ch.id, sampleId), null, undefined, { openChannel: ch.id });
+      toast.show(`Added ${name} as a ${kind === "drum" ? "one shot drum" : "pitched"} channel.`);
+    });
+  },
+  openSettings: (id) => store.set({ openChannel: id }),
   addKit808() {
     const have = new Set(project().channels.filter((c) => c.kind === "drum").map((c) => c.sound));
     const missing = DRUMS_808.filter((d) => !have.has(d));
@@ -527,6 +573,91 @@ function onMidi(e: MidiEvent) {
   else noteUp(`m${e.pitch}`);
 }
 
+/* ---------- Channel settings and mixer ---------- */
+
+/** Open the system file picker for an audio file. */
+const audioInput = h("input", { type: "file", accept: "audio/*,.wav,.mp3,.ogg,.flac,.aif,.aiff", class: "sr-only", tabindex: -1, "aria-hidden": "true" });
+let audioPicked: ((file: File) => void) | null = null;
+audioInput.addEventListener("change", () => {
+  const f = audioInput.files?.[0];
+  if (f && audioPicked) audioPicked(f);
+  audioInput.value = "";
+});
+function pickAudio(fn: (file: File) => void) {
+  audioPicked = fn;
+  audioInput.click();
+}
+
+/** The bundled sample library, listed in public/samples/manifest.json when there is one. */
+let library: LibrarySample[] = [];
+void fetch(`${import.meta.env.BASE_URL}samples/manifest.json`)
+  .then((r) => (r.ok ? r.json() : []))
+  .then((list: unknown) => {
+    if (!Array.isArray(list)) return;
+    library = list.filter(
+      (x): x is LibrarySample =>
+        typeof x?.id === "string" && typeof x?.name === "string" && typeof x?.url === "string" && typeof x?.group === "string",
+    );
+    render();
+  })
+  .catch(() => undefined);
+
+async function loadIntoChannel(channelId: string, file: File) {
+  const sampleId = makeId("s");
+  try {
+    await bank.importFile(file, sampleId);
+  } catch (err) {
+    toast.show(err instanceof Error ? err.message : "That file could not be loaded.", "error");
+    return;
+  }
+  const name = file.name.replace(/\.[^.]+$/, "").slice(0, 40) || "Sample";
+  edit((p) => setChannelSample(addSample(p, { id: sampleId, name, source: "user", root: 60 }), channelId, sampleId));
+  toast.show(`${name} loaded.`);
+}
+
+const channelSettings = createChannelSettings(
+  () => store.get(),
+  {
+    close: () => store.set({ openChannel: null }),
+    rename: (id, name) => edit((p) => renameChannel(p, id, name)),
+    setSound: (id, sound) => edit((p) => setChannelSample(setChannelSound(p, id, sound), id, null)),
+    setSample(id, sample) {
+      if (sample?.startsWith("lib:")) {
+        const item = library.find((x) => `lib:${x.id}` === sample);
+        if (!item) return;
+        const sampleId = `lib-${item.id}`;
+        edit((p) => setChannelSample(addSample(p, { id: sampleId, name: item.name, source: "bundled", url: item.url, root: item.root }), id, sampleId));
+        return;
+      }
+      edit((p) => setChannelSample(p, id, sample));
+    },
+    loadFile: (id, file) => void loadIntoChannel(id, file),
+    setRoot: (sampleId, root) =>
+      edit((p) => {
+        const info = p.samples.find((x) => x.id === sampleId);
+        return info ? addSample(p, { ...info, root }) : p;
+      }),
+    setTone: (id, patch) => edit((p) => setChannelTone(p, id, patch), `tone-${id}-${Object.keys(patch).join()}`),
+    setPan: (id, pan) => edit((p) => setChannelPan(p, id, pan), `pan-${id}`),
+    reset: (id) => edit((p) => resetChannelSound(p, id)),
+  },
+  () => library,
+);
+
+const mixer = createMixer({
+  close: () => store.set({ mixerOpen: false }),
+  setFx: (id, patch) => edit((p) => setChannelFx(p, id, patch), `fx-${id}-${Object.keys(patch).join()}`),
+  setPan: (id, pan) => edit((p) => setChannelPan(p, id, pan), `pan-${id}`),
+  setVolume: (id, volume) => edit((p) => setChannelMix(p, id, { volume }), `vol-${id}`),
+  setMute: (id, muted) => edit((p) => setChannelMix(p, id, { muted })),
+  setSolo: (id, solo) => edit((p) => setChannelMix(p, id, { solo })),
+  setMaster: (patch) => edit((p) => setMaster(p, patch), `master-${Object.keys(patch).join()}`),
+  openSettings: (id) => store.set({ openChannel: id }),
+});
+function toggleMixer() {
+  store.set((s) => ({ mixerOpen: !s.mixerOpen }));
+}
+
 /* ---------- Project files ---------- */
 
 const fileActions: FileActions = {
@@ -540,7 +671,7 @@ const fileActions: FileActions = {
     toast.show("New empty song.");
   },
   async openFile(file) {
-    if (file.size > 5_000_000) {
+    if (file.size > 200_000_000) {
       toast.show("That file is too big to be a Steplab project.", "error");
       return;
     }
@@ -557,12 +688,17 @@ const fileActions: FileActions = {
       return;
     }
     stop();
+    for (const [id, b64] of Object.entries(result.sampleData)) await bank.putEmbedded(id, b64);
+    bank.ensure(result.project.samples);
     replaceProject(result.project);
     toast.show(`Opened ${file.name}.`);
   },
-  saveFile() {
+  async saveFile() {
     const name = `steplab-${dateStamp()}.json`;
-    downloadBlob(new Blob([serializeProject(project(), true)], { type: "application/json" }), name);
+    const p = project();
+    // Your own samples travel inside the file, so it opens anywhere.
+    const data = await bank.embed(p.samples);
+    downloadBlob(new Blob([serializeProject(p, true, data)], { type: "application/json" }), name);
     toast.show(`Saved ${name}.`);
   },
   async exportWav() {
@@ -572,7 +708,7 @@ const fileActions: FileActions = {
     try {
       // Loaded on first use so the main bundle stays small.
       const { renderWav } = await import("./audio/render");
-      const blob = await renderWav(s.project, pat ? "pattern" : "song", pat?.id ?? null);
+      const blob = await renderWav(s.project, pat ? "pattern" : "song", pat?.id ?? null, (id) => bank.get(id));
       const slug = (pat?.name ?? "song").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "song";
       const name = `steplab-${slug}-${s.project.bpm}bpm.wav`;
       downloadBlob(blob, name);
@@ -623,6 +759,11 @@ const layoutSeg = segmented<Prefs["layout"]>({
   onChange: (layout) => setPrefs({ layout }),
   className: "seg-layout",
 });
+const mixerBtn = h(
+  "button",
+  { type: "button", class: "btn btn-small", title: "Mixer (F9)", "aria-keyshortcuts": "F9", onclick: () => toggleMixer() },
+  "Mixer",
+);
 const helpBtn = h(
   "button",
   { type: "button", class: "btn btn-small", title: "Keyboard shortcuts (F1)", "aria-keyshortcuts": "F1", onclick: openHelp },
@@ -689,7 +830,7 @@ app.append(
       "div",
       { class: "brand" },
       h("span", { class: "logo", "aria-hidden": "true" }, "Steplab"),
-      h("span", { class: "brand-tools" }, layoutSeg.el, helpBtn),
+      h("span", { class: "brand-tools" }, layoutSeg.el, mixerBtn, helpBtn),
       files.el,
     ),
     transport.el,
@@ -703,7 +844,7 @@ app.append(
   ),
   toast.el,
 );
-document.body.append(drumEditor.win.el, rollEditor.win.el, helpWin.el);
+document.body.append(drumEditor.win.el, rollEditor.win.el, helpWin.el, channelSettings.win.el, mixer.win.el, audioInput);
 paintStarfield();
 
 function render() {
@@ -713,19 +854,22 @@ function render() {
   playlist.update(s);
   drumEditor.update(s);
   rollEditor.update(s);
+  channelSettings.update(s);
+  mixer.update(s);
+  mixerBtn.setAttribute("aria-pressed", String(s.mixerOpen));
   files.setHistory(s.canUndo, s.canRedo);
   layoutSeg.setValue(s.prefs.layout);
   workspace.dataset.layout = s.prefs.layout;
   workspace.style.setProperty("--side-w", `${s.prefs.sidebarWidth}px`);
   splitter.setAttribute("aria-valuenow", String(s.prefs.sidebarWidth));
-  for (const w of [drumEditor.win, rollEditor.win, helpWin]) {
+  for (const w of [drumEditor.win, rollEditor.win, helpWin, channelSettings.win, mixer.win]) {
     w.setLayout(s.prefs.layout);
     w.fit();
   }
   document.documentElement.style.setProperty("--step-w", `${s.prefs.zoom}px`);
 }
 window.addEventListener("resize", () => {
-  for (const w of [drumEditor.win, rollEditor.win, helpWin]) w.fit();
+  for (const w of [drumEditor.win, rollEditor.win, helpWin, channelSettings.win, mixer.win]) w.fit();
 });
 
 // Autosave: quietly after each pause in editing, and right away when the tab is hidden.
@@ -771,6 +915,10 @@ store.subscribe((s, prev) => {
   if (s.project !== prev.project) {
     engine.setProject(s.project);
     autosave(s.project);
+    if (s.project.samples !== prev.project.samples) {
+      bank.ensure(s.project.samples);
+      store.set({ sampleStatus: sampleStatusFor(s.project) });
+    }
   }
   syncEngineSource(s);
   if (s.playState !== prev.playState && s.playState === "stopped") take = `take-${++takeCount}`;
@@ -833,6 +981,7 @@ document.addEventListener("keydown", (e) => {
     F5: () => playlist.focus(),
     F6: () => sidebar.focusRack(),
     F7: openPianoRoll,
+    F9: toggleMixer,
   };
   if (fkeys[e.key] && !mod && !e.altKey) {
     e.preventDefault();

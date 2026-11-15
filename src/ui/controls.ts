@@ -208,3 +208,45 @@ export function trackHead(opts: {
     },
   };
 }
+
+/** A labeled slider with its value shown beside it, for knobs in the channel settings and mixer. */
+export function slider(opts: {
+  label: string;
+  min: number;
+  max: number;
+  step?: number;
+  format: (v: number) => string;
+  onInput: (v: number) => void;
+  vertical?: boolean;
+  className?: string;
+}) {
+  const id = nextId("sl");
+  const input = h("input", {
+    id,
+    type: "range",
+    min: opts.min,
+    max: opts.max,
+    step: opts.step ?? 1,
+    class: opts.vertical ? "vertical" : undefined,
+    oninput: () => opts.onInput(Number(input.value)),
+  });
+  const out = h("output", { for: id, class: "slider-out" });
+  const el = h(
+    "label",
+    { class: `slider ${opts.vertical ? "slider-v" : ""} ${opts.className ?? ""}` },
+    h("span", { class: "slider-label" }, opts.label),
+    input,
+    out,
+  );
+  return {
+    el,
+    input,
+    set(v: number) {
+      if (Number(input.value) !== v && document.activeElement !== input) input.value = String(v);
+      else if (document.activeElement === input && Number(input.value) !== v) input.value = String(v);
+      const text = opts.format(v);
+      if (out.textContent !== text) out.textContent = text;
+      setAttr(input, "aria-valuetext", text);
+    },
+  };
+}

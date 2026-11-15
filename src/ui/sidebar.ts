@@ -8,6 +8,8 @@ import type { AppState } from "./store";
 
 export interface SidebarActions {
   addChannel(kind: "drum" | "synth", sound: DrumId | SynthId): void;
+  addSampleChannel(kind: "drum" | "synth"): void;
+  openSettings(id: string): void;
   removeChannel(id: string): void;
   renameChannel(id: string): void;
   setChannelSound(id: string, sound: DrumId | SynthId): void;
@@ -29,6 +31,7 @@ interface ChannelRow {
   name: HTMLButtonElement;
   sound: HTMLSelectElement;
   remove: HTMLButtonElement;
+  settings: HTMLButtonElement;
   head: TrackHead;
 }
 
@@ -57,6 +60,7 @@ export function createSidebar(actions: SidebarActions) {
       ...soundOptions(ch.kind),
     );
     const remove = h("button", { type: "button", class: "mini", onclick: () => actions.removeChannel(ch.id) }, "×");
+    const settings = h("button", { type: "button", class: "mini", onclick: () => actions.openSettings(ch.id) }, "Edit");
     const head = trackHead({
       name: ch.name,
       onMute: (m) => actions.setMute(ch.id, m),
@@ -66,10 +70,10 @@ export function createSidebar(actions: SidebarActions) {
     const el = h(
       "li",
       { class: "channel", "data-sound": ch.sound, "data-kind": ch.kind },
-      h("div", { class: "channel-top" }, h("span", { class: "swatch", "aria-hidden": "true" }), name, sound, remove),
+      h("div", { class: "channel-top" }, h("span", { class: "swatch", "aria-hidden": "true" }), name, sound, settings, remove),
       head.el,
     );
-    return { el, name, sound, remove, head };
+    return { el, name, sound, remove, settings, head };
   }
 
   const addSelect = h(
@@ -77,6 +81,12 @@ export function createSidebar(actions: SidebarActions) {
     { class: "select", "aria-label": "Sound for the new channel" },
     h("optgroup", { label: "Drums" }, ...DRUM_IDS.map((d) => h("option", { value: `drum:${d}` }, DRUM_NAMES[d]))),
     h("optgroup", { label: "Synths" }, ...SYNTH_IDS.map((s) => h("option", { value: `synth:${s}` }, SYNTHS[s].name))),
+    h(
+      "optgroup",
+      { label: "Your own audio" },
+      h("option", { value: "sample:drum" }, "Sample, one shot (drum)"),
+      h("option", { value: "sample:synth" }, "Sample, pitched (melody)"),
+    ),
   );
   const addBtn = h(
     "button",
@@ -84,8 +94,9 @@ export function createSidebar(actions: SidebarActions) {
       type: "button",
       class: "btn btn-small",
       onclick: () => {
-        const [kind, sound] = addSelect.value.split(":") as ["drum" | "synth", DrumId | SynthId];
-        actions.addChannel(kind, sound);
+        const [kind, sound] = addSelect.value.split(":");
+        if (kind === "sample") actions.addSampleChannel(sound === "synth" ? "synth" : "drum");
+        else actions.addChannel(kind as "drum" | "synth", sound as DrumId | SynthId);
       },
     },
     "Add channel",
@@ -203,6 +214,10 @@ export function createSidebar(actions: SidebarActions) {
         setAttr(row.sound, "aria-label", `${ch.name} sound`);
         if (row.sound.value !== ch.sound) row.sound.value = ch.sound;
         setAttr(row.remove, "aria-label", `Remove ${ch.name}`);
+        setAttr(row.settings, "aria-label", `${ch.name} settings: sound, sample and tone`);
+        setAttr(row.settings, "title", "Channel settings");
+        row.sound.title = ch.sample ? "Playing a sample. Open Edit to change it." : "";
+        row.el.classList.toggle("has-sample", !!ch.sample);
         setAttr(row.remove, "title", ch.kind === "synth" && synthCount === 1 ? "The last synth channel stays" : `Remove ${ch.name}`);
         row.remove.disabled = ch.kind === "synth" && synthCount === 1;
         row.el.dataset.sound = ch.sound;

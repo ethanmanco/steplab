@@ -2,7 +2,7 @@ import * as Tone from "tone";
 import { eventsAt, loopLength } from "../core/schedule";
 import { pulseSteps, secondsPerStep, stepFromTicks, stepsPerBar } from "../core/timing";
 import type { PlayMode, Project } from "../core/types";
-import { createGraph, type Graph } from "./graph";
+import { createGraph, type Graph, type SampleSource } from "./graph";
 
 export type PlayState = "stopped" | "counting" | "playing" | "paused";
 
@@ -29,7 +29,10 @@ export class Engine {
   state: PlayState = "stopped";
   metronome = false;
 
-  constructor(project: Project) {
+  constructor(
+    project: Project,
+    private samples: SampleSource = () => undefined,
+  ) {
     this.project = project;
   }
 
@@ -39,7 +42,7 @@ export class Engine {
     if (this.graph) return;
     const transport = Tone.getTransport();
     transport.bpm.value = this.project.bpm;
-    this.graph = createGraph(this.project);
+    this.graph = createGraph(this.project, this.samples);
     this.click = new Tone.Synth({
       oscillator: { type: "triangle" },
       envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 },

@@ -176,7 +176,7 @@ const builders: Record<SynthId, () => Instrument> = {
     {
       oscillator: { type: "custom", partials: [1, 0.55, 0.32, 0.22, 0.14, 0.09, 0.05, 0.03] },
       envelope: { attack: 0.002, decay: 2.2, sustain: 0, release: 0.7 },
-      volume: -10,
+      volume: -18,
     },
     lowpass(4200, 0.5),
   ),
@@ -198,7 +198,7 @@ const builders: Record<SynthId, () => Instrument> = {
     filter: { type: "lowpass", Q: 1, rolloff: -24 },
     envelope: { attack: 0.05, decay: 0.2, sustain: 0.8, release: 0.2 },
     filterEnvelope: { attack: 0.06, decay: 0.3, sustain: 0.6, release: 0.2, baseFrequency: 300, octaves: 3 },
-    volume: -12,
+    volume: -20.5,
   }),
 
   // Inharmonic FM with a long ring: glassy bells.
@@ -209,7 +209,7 @@ const builders: Record<SynthId, () => Instrument> = {
     modulation: { type: "sine" },
     envelope: { attack: 0.001, decay: 2.5, sustain: 0, release: 2 },
     modulationEnvelope: { attack: 0.001, decay: 1.5, sustain: 0, release: 1 },
-    volume: -14,
+    volume: -8,
   }),
 
   // Drawbar-style harmonics that sustain while held.
@@ -225,7 +225,7 @@ const builders: Record<SynthId, () => Instrument> = {
     {
       oscillator: { type: "fatsawtooth", count: 7, spread: 45 },
       envelope: { attack: 0.01, decay: 0.2, sustain: 0.8, release: 0.4 },
-      volume: -22,
+      volume: -21,
     },
     lowpass(6500, 0.5),
   ),
@@ -238,7 +238,7 @@ const builders: Record<SynthId, () => Instrument> = {
     modulation: { type: "sine" },
     envelope: { attack: 0.001, decay: 0.45, sustain: 0, release: 0.3 },
     modulationEnvelope: { attack: 0.001, decay: 0.08, sustain: 0, release: 0.05 },
-    volume: -6,
+    volume: -8,
   }),
 
   // A soft triangle with a gentle swell and vibrato.
@@ -247,7 +247,7 @@ const builders: Record<SynthId, () => Instrument> = {
     {
       oscillator: { type: "triangle" },
       envelope: { attack: 0.08, decay: 0.1, sustain: 0.9, release: 0.25 },
-      volume: -8,
+      volume: -18,
     },
     () => [new Tone.Vibrato({ frequency: 5, depth: 0.08 }), new Tone.Filter({ type: "lowpass", frequency: 2600 })],
   ),
@@ -256,7 +256,7 @@ const builders: Record<SynthId, () => Instrument> = {
   sub: poly(Tone.Synth, {
     oscillator: { type: "sine" },
     envelope: { attack: 0.005, decay: 0.2, sustain: 0.9, release: 0.15 },
-    volume: -4,
+    volume: -6,
   }),
 
   // Two detuned saws, filtered dark: the drum and bass "reese".
@@ -274,7 +274,7 @@ const builders: Record<SynthId, () => Instrument> = {
   chip: poly(Tone.Synth, {
     oscillator: { type: "pulse", width: 0.25 },
     envelope: { attack: 0.001, decay: 0.1, sustain: 0.6, release: 0.05 },
-    volume: -18,
+    volume: -21,
   }),
 };
 
