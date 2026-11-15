@@ -28,9 +28,10 @@ const NEW = "__new";
 
 /**
  * The play and record dock for phones and tablets. It sits at the bottom of
- * the screen, over everything, so Play and Record stay under your thumb while
- * the on-screen keyboard is open. The transport buttons are moved in here
- * from the top bar (see main.ts), so there is only ever one of each.
+ * the screen, over everything, so Play and Record stay in reach while the
+ * on-screen keyboard is open, but well clear of the keys. The transport
+ * buttons are moved in here from the top bar (see main.ts), so there is only
+ * ever one of each.
  */
 export function createDock(actions: DockActions) {
   const bar = h("div", { class: "dock-bar" });
@@ -74,7 +75,9 @@ export function createDock(actions: DockActions) {
   const tools = h("div", { class: "dock-tools" }, keysToggle);
   bar.append(tools);
 
-  const el = h("div", { class: "dock", role: "region", "aria-label": "Play, record and keyboard" }, keysPanel, bar);
+  // Transport on top, keys at the bottom edge where thumbs rest, with the
+  // melody row between them, so a missed key never lands on Stop or Record.
+  const el = h("div", { class: "dock", role: "region", "aria-label": "Play, record and keyboard" }, bar, keysPanel);
 
   /* ---------- Keys ---------- */
 
