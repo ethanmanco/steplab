@@ -36,6 +36,42 @@
   "source": "VCSL"
  },
  {
+  "id": "upright-piano",
+  "name": "Upright piano",
+  "group": "Keys",
+  "kind": "melodic",
+  "url": "samples/keys/upright-piano.wav",
+  "root": 60,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "harpsichord",
+  "name": "Harpsichord",
+  "group": "Keys",
+  "kind": "melodic",
+  "url": "samples/keys/harpsichord.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "fm-piano-2",
+  "name": "FM piano 2",
+  "group": "Keys",
+  "kind": "melodic",
+  "url": "samples/keys/fm-piano-2.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "chamber-organ",
+  "name": "Chamber organ",
+  "group": "Keys",
+  "kind": "melodic",
+  "url": "samples/keys/chamber-organ.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
   "id": "marimba",
   "name": "Marimba",
   "group": "Mallets",
@@ -90,6 +126,24 @@
   "source": "VCSL"
  },
  {
+  "id": "balafon",
+  "name": "Balafon",
+  "group": "Mallets",
+  "kind": "melodic",
+  "url": "samples/mallets/balafon.wav",
+  "root": 72,
+  "source": "VCSL"
+ },
+ {
+  "id": "hand-chimes",
+  "name": "Hand chimes",
+  "group": "Mallets",
+  "kind": "melodic",
+  "url": "samples/mallets/hand-chimes.wav",
+  "root": 72,
+  "source": "VCSL"
+ },
+ {
   "id": "harp",
   "name": "Harp",
   "group": "Strings",
@@ -126,6 +180,60 @@
   "source": "VSCO 2 CE"
  },
  {
+  "id": "violas",
+  "name": "Violas",
+  "group": "Strings",
+  "kind": "melodic",
+  "url": "samples/strings/violas.wav",
+  "root": 72,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "viola-pizz",
+  "name": "Violas, pizzicato",
+  "group": "Strings",
+  "kind": "melodic",
+  "url": "samples/strings/viola-pizz.wav",
+  "root": 72,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "cellos",
+  "name": "Cellos",
+  "group": "Strings",
+  "kind": "melodic",
+  "url": "samples/strings/cellos.wav",
+  "root": 60,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "solo-violin",
+  "name": "Solo violin",
+  "group": "Strings",
+  "kind": "melodic",
+  "url": "samples/strings/solo-violin.wav",
+  "root": 60,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "strumstick",
+  "name": "Strumstick",
+  "group": "Guitars and bass",
+  "kind": "melodic",
+  "url": "samples/guitars/strumstick.wav",
+  "root": 62,
+  "source": "VCSL"
+ },
+ {
+  "id": "upright-bass",
+  "name": "Upright bass",
+  "group": "Guitars and bass",
+  "kind": "melodic",
+  "url": "samples/guitars/upright-bass.wav",
+  "root": 45,
+  "source": "VSCO 2 CE"
+ },
+ {
   "id": "flute",
   "name": "Flute",
   "group": "Winds and brass",
@@ -159,6 +267,96 @@
   "kind": "melodic",
   "url": "samples/winds/tenor-sax.wav",
   "root": 72,
+  "source": "VCSL"
+ },
+ {
+  "id": "clarinet",
+  "name": "Clarinet",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/clarinet.wav",
+  "root": 65,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "oboe",
+  "name": "Oboe",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/oboe.wav",
+  "root": 65,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "bassoon",
+  "name": "Bassoon",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/bassoon.wav",
+  "root": 60,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "trombone",
+  "name": "Trombone",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/trombone.wav",
+  "root": 60,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "tuba",
+  "name": "Tuba",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/tuba.wav",
+  "root": 46,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "muted-trumpet",
+  "name": "Muted trumpet",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/muted-trumpet.wav",
+  "root": 60,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "soprano-sax",
+  "name": "Soprano sax",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/soprano-sax.wav",
+  "root": 62,
+  "source": "VCSL"
+ },
+ {
+  "id": "recorder",
+  "name": "Recorder",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/recorder.wav",
+  "root": 72,
+  "source": "VCSL"
+ },
+ {
+  "id": "ocarina",
+  "name": "Ocarina",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/ocarina.wav",
+  "root": 74,
+  "source": "VCSL"
+ },
+ {
+  "id": "harmonica",
+  "name": "Harmonica",
+  "group": "Winds and brass",
+  "kind": "melodic",
+  "url": "samples/winds/harmonica.wav",
+  "root": 60,
   "source": "VCSL"
  },
  {
@@ -221,6 +419,78 @@
   "group": "Drums",
   "kind": "oneshot",
   "url": "samples/drums/ac-tom.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "crash",
+  "name": "Crash cymbal",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/crash.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "ride",
+  "name": "Ride cymbal",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/ride.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "ride-bell",
+  "name": "Ride bell",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/ride-bell.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "rimshot",
+  "name": "Rimshot, acoustic",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/rimshot.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "cross-stick",
+  "name": "Cross stick",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/cross-stick.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "low-tom",
+  "name": "Tom, low",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/low-tom.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "snare-2",
+  "name": "Snare, acoustic 2",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/snare-2.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "hat-pedal",
+  "name": "Hi-hat, pedal",
+  "group": "Drums",
+  "kind": "oneshot",
+  "url": "samples/drums/hat-pedal.wav",
   "root": 60,
   "source": "VCSL"
  },
@@ -311,6 +581,96 @@
   "group": "Percussion",
   "kind": "oneshot",
   "url": "samples/percussion/triangle.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "cabasa",
+  "name": "Cabasa",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/cabasa.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "guiro",
+  "name": "Guiro",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/guiro.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "sleigh-bells",
+  "name": "Sleigh bells",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/sleigh-bells.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "finger-cymbal",
+  "name": "Finger cymbal",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/finger-cymbal.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "vibraslap",
+  "name": "Vibraslap",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/vibraslap.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "frame-drum",
+  "name": "Frame drum",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/frame-drum.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "darbuka",
+  "name": "Darbuka",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/darbuka.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "slit-drum",
+  "name": "Slit drum",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/slit-drum.wav",
+  "root": 60,
+  "source": "VCSL"
+ },
+ {
+  "id": "gong",
+  "name": "Gong",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/gong.wav",
+  "root": 60,
+  "source": "VSCO 2 CE"
+ },
+ {
+  "id": "wind-chimes",
+  "name": "Wind chimes",
+  "group": "Percussion",
+  "kind": "oneshot",
+  "url": "samples/percussion/wind-chimes.wav",
   "root": 60,
   "source": "VCSL"
  }

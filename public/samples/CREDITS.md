@@ -9,6 +9,6 @@ Thank you to Versilian Studios and everyone who recorded for these libraries. VS
 
 ## What was changed
 
-One recording was chosen per instrument. Each was trimmed to a few seconds (with its leading silence removed so hits land on the beat), faded out, mixed to mono, resampled to 32 kHz, 16-bit, and peak-normalized. The root note of each melodic sample was measured with a pitch detector, because the libraries name notes one octave lower than scientific pitch.
+One recording was chosen per instrument. Quiet recordings were first raised to full level. Each was trimmed to a few seconds (with its leading silence removed so hits land on the beat), faded out, mixed to mono, resampled to 32 kHz, 16-bit, and peak-normalized. The root note of each melodic sample was measured with a pitch detector, because the libraries name notes one octave lower than scientific pitch.
 
 `manifest.json` lists every file with its name, group, root note and source library.
