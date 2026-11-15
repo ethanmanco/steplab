@@ -1087,7 +1087,24 @@ app.append(
     "footer",
     { class: "foot" },
     h("p", { class: "touch-hide" }, "FL Studio shortcuts work here: ", h("kbd", {}, "Space"), " play, ", h("kbd", {}, "R"), " record, ", h("kbd", {}, "L"), " pattern or song, ", h("kbd", {}, "Alt"), " + drag to skip snapping. Press ", h("kbd", {}, "F1"), " for the full list."),
-    h("p", { class: "foot-save" }, "Your song autosaves in this browser."),
+    h(
+      "p",
+      { class: "foot-save" },
+      "Your song autosaves in this browser.",
+      // A quiet way to say thanks: stars are how GitHub projects get rated.
+      h(
+        "a",
+        {
+          class: "star-link",
+          href: "https://github.com/ethanmanco/steplab",
+          target: "_blank",
+          rel: "noopener",
+          title: "Opens the Steplab project on GitHub, where you can give it a star",
+        },
+        h("span", { class: "star-icon", "aria-hidden": "true" }, "★"),
+        "Like Steplab? Star it on GitHub",
+      ),
+    ),
   ),
   toast.el,
 );

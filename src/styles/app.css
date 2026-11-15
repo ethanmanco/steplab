@@ -1679,7 +1679,36 @@ input[type="range"] {
 }
 
 .foot-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
   flex-basis: 100%;
+}
+
+.star-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.star-link:hover,
+.star-link:focus-visible {
+  border-color: rgba(255, 198, 26, 0.6);
+  background: rgba(255, 198, 26, 0.08);
+}
+
+.star-icon {
+  color: #ffc61a;
 }
 
 kbd {
