@@ -1877,3 +1877,45 @@ kbd {
   grid-template-columns: 1fr;
   justify-items: center;
 }
+
+/* ---------- Examples window ---------- */
+
+.examples-body {
+  overflow: auto;
+  padding: 0 18px 16px;
+  max-width: 560px;
+}
+
+.example-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.example {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.example-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.example h3 {
+  margin: 0 0 2px;
+  font-size: 0.92rem;
+}
+
+.example p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}

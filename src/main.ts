@@ -66,6 +66,8 @@ import { segmented } from "./ui/controls";
 import { createShortcutsWindow } from "./ui/shortcuts";
 import { createChannelSettings, type LibrarySample } from "./ui/channelSettings";
 import { createMixer } from "./ui/mixer";
+import { createExamplesWindow } from "./ui/examples";
+import { PRESETS } from "./core/presets";
 import { createSampleBank } from "./samples";
 import { createPlaylist } from "./ui/playlist";
 import { createSidebar } from "./ui/sidebar";
@@ -818,6 +820,27 @@ const layoutSeg = segmented<Prefs["layout"]>({
   onChange: (layout) => setPrefs({ layout }),
   className: "seg-layout",
 });
+// Example songs. Loading one is an ordinary edit, so Ctrl+Z returns to your own song.
+const examplesWin = createExamplesWindow(PRESETS, (preset) => {
+  stop();
+  const next = preset.build();
+  edit(() => next, null, undefined, {
+    mode: "song",
+    current: next.patterns[0]?.id ?? null,
+    openDrums: null,
+    openRoll: null,
+    openChannel: null,
+    selectedClip: null,
+    backing: null,
+  });
+  examplesWin.hide();
+  toast.show(`Loaded ${preset.name}. Press Space to play. Ctrl+Z brings back your song.`);
+});
+const examplesBtn = h(
+  "button",
+  { type: "button", class: "btn btn-small", title: "Load an example song", onclick: () => examplesWin.show() },
+  "Examples",
+);
 const mixerBtn = h(
   "button",
   { type: "button", class: "btn btn-small", title: "Mixer (F9)", "aria-keyshortcuts": "F9", onclick: () => toggleMixer() },
@@ -889,7 +912,7 @@ app.append(
       "div",
       { class: "brand" },
       h("span", { class: "logo", "aria-hidden": "true" }, "Steplab"),
-      h("span", { class: "brand-tools" }, layoutSeg.el, mixerBtn, helpBtn),
+      h("span", { class: "brand-tools" }, layoutSeg.el, examplesBtn, mixerBtn, helpBtn),
       files.el,
     ),
     transport.el,
@@ -903,7 +926,7 @@ app.append(
   ),
   toast.el,
 );
-document.body.append(drumEditor.win.el, rollEditor.win.el, helpWin.el, channelSettings.win.el, mixer.win.el, audioInput);
+document.body.append(drumEditor.win.el, rollEditor.win.el, helpWin.el, channelSettings.win.el, mixer.win.el, examplesWin.el, audioInput);
 paintStarfield();
 
 function render() {
@@ -921,14 +944,14 @@ function render() {
   workspace.dataset.layout = s.prefs.layout;
   workspace.style.setProperty("--side-w", `${s.prefs.sidebarWidth}px`);
   splitter.setAttribute("aria-valuenow", String(s.prefs.sidebarWidth));
-  for (const w of [drumEditor.win, rollEditor.win, helpWin, channelSettings.win, mixer.win]) {
+  for (const w of [drumEditor.win, rollEditor.win, helpWin, channelSettings.win, mixer.win, examplesWin]) {
     w.setLayout(s.prefs.layout);
     w.fit();
   }
   document.documentElement.style.setProperty("--step-w", `${s.prefs.zoom}px`);
 }
 window.addEventListener("resize", () => {
-  for (const w of [drumEditor.win, rollEditor.win, helpWin, channelSettings.win, mixer.win]) w.fit();
+  for (const w of [drumEditor.win, rollEditor.win, helpWin, channelSettings.win, mixer.win, examplesWin]) w.fit();
 });
 
 // Autosave: quietly after each pause in editing, and right away when the tab is hidden.
