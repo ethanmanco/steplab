@@ -2414,3 +2414,22 @@ kbd {
     font-size: 0.7rem;
   }
 }
+
+/* ---------- Phones and tablets: spare the graphics chip ---------- */
+
+/* Blurring what is behind a panel is redone on every frame something moves,
+   and budget phones feel it while the playhead runs. Solid panels instead. */
+@media (max-width: 720px), (pointer: coarse) {
+  .top,
+  .panel,
+  .start,
+  .dock {
+    backdrop-filter: none;
+  }
+  .top {
+    background: rgba(0, 0, 0, 0.94);
+  }
+  .panel {
+    background: rgba(10, 10, 13, 0.94);
+  }
+}

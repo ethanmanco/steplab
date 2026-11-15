@@ -5,6 +5,7 @@ import { audibleChannels, type StepEvents } from "../core/schedule";
 import { secondsPerStep, swingDelay } from "../core/timing";
 import { DEFAULT_TONE } from "../core/project";
 import type { Channel, DelayTime, DrumId, Project, SynthId, ToneShape } from "../core/types";
+import { bakedDrumVoice, isBaked, requestBake } from "./bake";
 import { createDrumVoice, type DrumVoice } from "./drums";
 import { createInstrument, cutoffHz, envelopeScale, type Instrument } from "./instruments";
 
@@ -109,6 +110,12 @@ function sampleDrum(buffer: AudioBuffer): DrumVoice {
   };
 }
 
+/** A built-in drum: its baked recording when ready (far lighter), its synthesized voice until then. */
+function liveOrBaked(id: DrumId): DrumVoice {
+  requestBake(id);
+  return bakedDrumVoice(id) ?? createDrumVoice(id);
+}
+
 export function createGraph(project: Project, samples: SampleSource = () => undefined): Graph {
   const context = Tone.getContext();
   const limiter = new Tone.Limiter(-1).toDestination();
@@ -130,14 +137,16 @@ export function createGraph(project: Project, samples: SampleSource = () => unde
   function voiceKey(p: Project, ch: Channel): string {
     const info = ch.sample ? p.samples.find((s) => s.id === ch.sample) : undefined;
     const loaded = info && samples(info.id) ? `${info.id}@${info.root}` : "";
-    return `${ch.kind}:${ch.sound}:${loaded}`;
+    // A drum's voice changes once its baked recording is ready.
+    const baked = ch.kind === "drum" && !loaded && isBaked(ch.sound as DrumId) ? "baked" : "";
+    return `${ch.kind}:${ch.sound}:${loaded}:${baked}`;
   }
 
   function makeVoice(p: Project, ch: Channel, slot: Slot) {
     const info = ch.sample ? p.samples.find((s) => s.id === ch.sample) : undefined;
     const buffer = info ? samples(info.id) : undefined;
     if (ch.kind === "drum") {
-      slot.drum = buffer ? sampleDrum(buffer) : createDrumVoice(ch.sound);
+      slot.drum = buffer ? sampleDrum(buffer) : liveOrBaked(ch.sound);
       slot.drum.output.connect(slot.filter);
     } else {
       slot.synth = buffer && info ? sampleInstrument(buffer, info.root) : createInstrument(ch.sound);
@@ -306,7 +315,7 @@ export function createGraph(project: Project, samples: SampleSource = () => unde
       audition = null;
       if (!sound) return;
       if (sound.kind === "drum") {
-        const drum = sound.buffer ? sampleDrum(sound.buffer) : createDrumVoice(sound.sound);
+        const drum = sound.buffer ? sampleDrum(sound.buffer) : liveOrBaked(sound.sound);
         drum.output.connect(auditionOut);
         audition = { key, drum };
       } else {

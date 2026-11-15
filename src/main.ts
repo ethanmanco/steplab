@@ -1,5 +1,5 @@
 import "./styles/app.css";
-import { Engine } from "./audio/engine";
+import { Engine, useRelaxedAudioTiming } from "./audio/engine";
 import { createHistory, pushHistory, redo, resetHistory, undo, type History } from "./core/history";
 import { KEYS_DEFAULT_BASE, keyToPitch, shiftOctave } from "./core/keymap";
 import type { MidiEvent } from "./core/midi";
@@ -76,16 +76,21 @@ import {
   COMPACT_QUERY,
   TOUCH_QUERY,
   createStore,
+  isTouch,
   sectionOpen,
   type AppState,
   type Prefs,
   type SectionId,
 } from "./ui/store";
 import { createDock } from "./ui/dock";
+import { onBaked } from "./audio/bake";
 import { createSoundBrowser } from "./ui/soundBrowser";
 import type { SoundItem } from "./core/soundCatalog";
 import type { AuditionSound } from "./audio/graph";
 import { createTransport } from "./ui/transport";
+
+// On phones and tablets, trade a little key delay for audio that keeps up (see useRelaxedAudioTiming).
+if (isTouch()) useRelaxedAudioTiming();
 
 const storage = getStorage();
 const DEFAULT_PREFS: Prefs = {
@@ -156,6 +161,8 @@ function sampleStatusFor(p: Project): Record<string, string> {
   return out;
 }
 const engine = new Engine(initialProject, (id) => bank.get(id));
+// Swap each drum to its baked recording as soon as it is ready.
+onBaked(() => engine.setProject(project()));
 bank.ensure(initialProject.samples);
 engine.metronome = store.get().prefs.metronome;
 engine.setSource("song", store.get().current);

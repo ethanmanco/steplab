@@ -15,6 +15,17 @@ export type PlayState = "stopped" | "counting" | "playing" | "paused";
  * The playhead is drawn with Tone's Draw queue, which fires the visual
  * callback when that same `time` is actually heard.
  */
+/**
+ * Phones and tablets: give the audio more room. A bigger buffer means a slow
+ * processor has more time to work out each slice of sound before the speaker
+ * needs it (no crackles), and scheduling notes further ahead keeps the beat
+ * steady when the page is busy (no dragging). The cost is a little more delay
+ * on live keys, which recording already allows for. Run it before any sound.
+ */
+export function useRelaxedAudioTiming(): void {
+  Tone.setContext(new Tone.Context({ latencyHint: "playback", lookAhead: 0.2 }), true);
+}
+
 export class Engine {
   private project: Project;
   private mode: PlayMode = "song";
@@ -181,8 +192,9 @@ export class Engine {
    */
   heardSteps(): number | null {
     if (this.state !== "playing" && this.state !== "counting") return null;
+    // Sound leaves the browser's buffer (baseLatency) and then the device (outputLatency) before it is heard.
     const raw = Tone.getContext().rawContext as AudioContext;
-    const now = Tone.immediate() - (raw.outputLatency || 0);
+    const now = Tone.immediate() - (raw.baseLatency || 0) - (raw.outputLatency || 0);
     if (now < this.countInEnd) return (now - this.countInEnd) / secondsPerStep(this.project.bpm);
     const transport = Tone.getTransport();
     return transport.getTicksAtTime(now) / (transport.PPQ / 4);
