@@ -26,6 +26,10 @@ export interface Prefs {
   sidebarWidth: number;
   /** What clips snap to in the playlist. Alt bypasses it, like FL Studio. */
   snap: "bar" | "beat" | "step";
+  /** What plays while recording: the melody alone, it with backing patterns, or the whole song. */
+  recordWith: "alone" | "backing" | "song";
+  /** Volume of everything except the recorded channel while recording, 0..1. */
+  backingLevel: number;
 }
 
 export interface AppState {
@@ -39,6 +43,8 @@ export interface AppState {
   openDrums: string | null;
   openRoll: string | null;
   selectedClip: string | null;
+  /** Patterns that play along while recording with backing. Null means automatic: what plays alongside in the song. */
+  backing: string[] | null;
   drawLength: DrawLength;
   prefs: Prefs;
   canUndo: boolean;

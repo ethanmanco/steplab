@@ -1,5 +1,5 @@
 import { ROLL_HIGH, ROLL_ROWS, SYNTHS, isBlackKey, midiToName, midiToSpoken } from "../core/notes";
-import { drumStepOn, findChannel, findPattern, noteAt, patternSteps } from "../core/project";
+import { drumStepOn, findChannel, findPattern, noteAt, patternSteps, playsAlongside } from "../core/project";
 import { QUANTIZE_OPTIONS } from "../core/record";
 import { audibleChannels } from "../core/schedule";
 import { maxBarsFor, pulseSteps, stepPosition, stepsPerBar } from "../core/timing";
@@ -213,6 +213,9 @@ export interface RollEditorActions extends CommonEditorActions {
   setKeys(on: boolean): void;
   shiftOctave(dir: 1 | -1): void;
   connectMidi(): void;
+  setRecordWith(value: "alone" | "backing" | "song"): void;
+  toggleBacking(patternId: string, on: boolean): void;
+  setBackingLevel(level: number): void;
 }
 
 const DRAW_OPTIONS: { value: DrawLength; label: string; title: string }[] = [
@@ -271,6 +274,36 @@ export function createRollEditor(getState: () => AppState, actions: RollEditorAc
   );
   const midiStatus = h("span", { class: "midi-status", role: "status" });
   const midiBtn = h("button", { type: "button", class: "btn btn-small", onclick: () => actions.connectMidi() }, "Connect MIDI");
+  // What you hear while recording, so you can play along with the beat.
+  const hear = segmented<"alone" | "backing" | "song">({
+    legend: "Hear while recording",
+    options: [
+      { value: "alone", label: "Just this", title: "Only this melody loops while you record" },
+      { value: "backing", label: "Backing", title: "This melody loops with the patterns you pick below" },
+      { value: "song", label: "Song", title: "The whole song plays; notes go wherever this melody's clips are" },
+    ],
+    value: "backing",
+    onChange: actions.setRecordWith,
+    className: "seg-hear",
+  });
+  const level = h("input", {
+    type: "range",
+    min: 0,
+    max: 100,
+    step: 1,
+    "aria-label": "Backing volume while recording",
+    oninput: () => actions.setBackingLevel(Number(level.value) / 100),
+  });
+  const levelOut = h("span", { class: "unit", "aria-hidden": "true" });
+  const levelField = h(
+    "span",
+    { class: "field", title: "How loud everything else is while you record" },
+    h("span", { class: "field-label", "aria-hidden": "true" }, "Backing volume"),
+    level,
+    levelOut,
+  );
+  const chips = h("div", { class: "backing-chips", role: "group", "aria-label": "Backing patterns" });
+  const songNote = h("span", { class: "hear-note" });
   const recordRow = h(
     "div",
     { class: "record-row", role: "group", "aria-label": "Recording" },
@@ -281,6 +314,7 @@ export function createRollEditor(getState: () => AppState, actions: RollEditorAc
     octave,
     midiBtn,
     midiStatus,
+    h("div", { class: "record-row-2" }, hear.el, levelField, songNote, chips),
   );
 
   const keyHeads = Array.from({ length: ROLL_ROWS }, (_, r) => {
@@ -414,6 +448,37 @@ export function createRollEditor(getState: () => AppState, actions: RollEditorAc
       keys.set(s.prefs.keys);
       octave.hidden = !s.prefs.keys;
       octaveLabel.textContent = `Z = ${midiToName(s.prefs.keysBase)}`;
+
+      hear.setValue(s.prefs.recordWith);
+      const pct = String(Math.round(s.prefs.backingLevel * 100));
+      if (level.value !== pct) level.value = pct;
+      level.setAttribute("aria-valuetext", `${pct}%`);
+      levelOut.textContent = `${pct}%`;
+      levelField.hidden = s.prefs.recordWith === "alone";
+      chips.hidden = s.prefs.recordWith !== "backing";
+      const placed = p.clips.some((c) => c.patternId === pat.id);
+      songNote.textContent =
+        s.prefs.recordWith === "song" && !placed ? `Place ${pat.name} on the playlist to record over the song.` : "";
+      const backing = s.backing ?? playsAlongside(p, pat.id);
+      const chipKey = `${pat.id}|${backing.join()}|${p.patterns.map((x) => `${x.id}:${x.name}`).join()}`;
+      if (chips.dataset.key !== chipKey) {
+        chips.dataset.key = chipKey;
+        const others = p.patterns.filter((x) => x.id !== pat.id);
+        chips.replaceChildren(
+          ...(others.length
+            ? others.map((x) => {
+                const box = h("input", {
+                  type: "checkbox",
+                  class: "chip-input",
+                  onchange: () => actions.toggleBacking(x.id, box.checked),
+                });
+                box.checked = backing.includes(x.id);
+                const sound = x.kind === "melody" ? findChannel(p, x.channelId)?.sound ?? "lead" : "drums";
+                return h("label", { class: "chip", "data-sound": sound }, box, h("span", { class: "swatch", "aria-hidden": "true" }), x.name);
+              })
+            : [h("span", { class: "hear-note" }, "Make another pattern to play along with.")]),
+        );
+      }
       win.el.classList.toggle("track-silent", !audibleChannels(p).has(pat.channelId));
 
       const total = patternSteps(pat, p.timeSig);

@@ -25,6 +25,7 @@ import {
   moveClip,
   noteAt,
   patternSteps,
+  playsAlongside,
   removeChannel,
   removeNoteAt,
   renameChannel,
@@ -43,7 +44,7 @@ import {
   synthChannel,
   synthChannels,
 } from "./core/project";
-import { recordedNote } from "./core/record";
+import { positionInPattern, recordedNote } from "./core/record";
 import { clipAt } from "./core/schedule";
 import { parseProject, serializeProject } from "./core/serialize";
 import { DRUMS_808, type Channel, type DrumId, type MelodyPattern, type Project, type SynthId } from "./core/types";
@@ -74,6 +75,8 @@ const DEFAULT_PREFS: Prefs = {
   layout: "auto",
   sidebarWidth: 320,
   snap: "bar",
+  recordWith: "backing",
+  backingLevel: 0.7,
 };
 /** Settings come from storage, so make sure the choice-type ones hold a real choice. */
 function cleanPrefs(p: Prefs): Prefs {
@@ -82,10 +85,13 @@ function cleanPrefs(p: Prefs): Prefs {
     layout: p.layout === "manual" ? "manual" : "auto",
     snap: ["bar", "beat", "step"].includes(p.snap) ? p.snap : "bar",
     sidebarWidth: Math.min(640, Math.max(240, p.sidebarWidth || 320)),
+    recordWith: ["alone", "backing", "song"].includes(p.recordWith) ? p.recordWith : "backing",
+    backingLevel: Math.min(1, Math.max(0, Number.isFinite(p.backingLevel) ? p.backingLevel : 0.7)),
   };
 }
 const initialProject = loadAutosave(storage) ?? demoProject();
 let history: History<Project> = createHistory(initialProject);
+
 
 const store = createStore({
   project: initialProject,
@@ -93,6 +99,7 @@ const store = createStore({
   recordArmed: false,
   mode: "song",
   current: initialProject.patterns[0]?.id ?? null,
+  backing: null,
   openDrums: null,
   openRoll: null,
   selectedClip: null,
@@ -117,6 +124,7 @@ function tidy(p: Project, s: AppState): Partial<AppState> {
     openDrums: has(s.openDrums) ? s.openDrums : null,
     openRoll: has(s.openRoll) ? s.openRoll : null,
     selectedClip: p.clips.some((c) => c.id === s.selectedClip) ? s.selectedClip : null,
+    backing: s.backing && s.backing.filter((id) => has(id)),
   };
 }
 function syncHistory(extra: Partial<AppState> = {}) {
@@ -143,7 +151,7 @@ function doRedo() {
 }
 function replaceProject(p: Project) {
   history = resetHistory(p);
-  syncHistory({ current: p.patterns[0]?.id ?? null, openDrums: null, openRoll: null, selectedClip: null });
+  syncHistory({ current: p.patterns[0]?.id ?? null, openDrums: null, openRoll: null, selectedClip: null, backing: null });
 }
 function setPrefs(patch: Partial<Prefs>) {
   store.set((s) => ({ prefs: { ...s.prefs, ...patch } }));
@@ -154,7 +162,9 @@ function setPrefs(patch: Partial<Prefs>) {
 function openPattern(id: string) {
   const pat = findPattern(project(), id);
   if (!pat) return;
-  store.set(pat.kind === "drums" ? { openDrums: id, current: id } : { openRoll: id, current: id });
+  // A different melody starts with its own automatic backing.
+  const fresh = pat.kind === "melody" && store.get().openRoll !== id ? { backing: null } : {};
+  store.set(pat.kind === "drums" ? { openDrums: id, current: id } : { openRoll: id, current: id, ...fresh });
 }
 
 /** A free place for a pattern: after its last clip, or at bar 1 on the first empty track. */
@@ -196,8 +206,7 @@ let takeCount = 0;
 let take = "take-0";
 
 /** The melody that recording and live keys go to: the open piano roll, else the current melody. */
-function recordTarget(): MelodyPattern | undefined {
-  const s = store.get();
+function recordTarget(s: AppState = store.get()): MelodyPattern | undefined {
   const open = findPattern(s.project, s.openRoll);
   if (open?.kind === "melody") return open;
   const cur = findPattern(s.project, s.current);
@@ -221,8 +230,17 @@ function togglePlay() {
       toast.show("Open a melody to record into it.", "error");
       return;
     }
-    // Recording loops the melody being recorded, like FL's pattern mode.
-    if (s.mode !== "pattern" || s.current !== target.id) store.set({ mode: "pattern", current: target.id });
+    if (s.prefs.recordWith === "song") {
+      // Record over the whole song: notes land wherever this melody has clips.
+      if (!s.project.clips.some((c) => c.patternId === target.id)) {
+        toast.show(`Place ${target.name} on the playlist to record over the song.`, "error");
+        return;
+      }
+      if (s.mode !== "song" || s.current !== target.id) store.set({ mode: "song", current: target.id });
+    } else if (s.mode !== "pattern" || s.current !== target.id) {
+      // Otherwise loop the melody, with its backing patterns if chosen.
+      store.set({ mode: "pattern", current: target.id });
+    }
   }
   engine.play(s.recordArmed && s.prefs.countIn && s.playState === "stopped");
 }
@@ -412,6 +430,14 @@ const rollEditor = createRollEditor(() => store.get(), {
   setDrawLength: (drawLength) => store.set({ drawLength }),
   setCountIn: (countIn) => setPrefs({ countIn }),
   setQuantize: (quantize) => setPrefs({ quantize }),
+  setRecordWith: (recordWith) => setPrefs({ recordWith }),
+  toggleBacking: (id, on) =>
+    store.set((s) => {
+      const target = recordTarget(s);
+      const base = s.backing ?? (target ? playsAlongside(s.project, target.id) : []);
+      return { backing: on ? [...new Set([...base, id])] : base.filter((x) => x !== id) };
+    }),
+  setBackingLevel: (backingLevel) => setPrefs({ backingLevel }),
   setKeys: (keys) => setPrefs({ keys }),
   shiftOctave: (dir) => setPrefs({ keysBase: shiftOctave(store.get().prefs.keysBase, dir) }),
   async connectMidi() {
@@ -435,8 +461,8 @@ interface Held {
   patternId: string | null;
   pitch: number;
   velocity: number;
-  /** Position when the key went down, or null when not recording. */
-  down: number | null;
+  /** Where the key went down, inside the pattern and as heard, or null when not recording. */
+  down: { local: number; heard: number } | null;
 }
 const held = new Map<string, Held>();
 
@@ -445,10 +471,8 @@ function noteDown(key: string, pitch: number, velocity: number) {
   const channelId = liveChannel();
   if (!channelId) return;
   engine.noteOn(channelId, pitch, velocity);
-  const s = store.get();
   const target = recordTarget();
-  const recording = s.recordArmed && running() && s.mode === "pattern" && target?.id === s.current;
-  held.set(key, { channelId, patternId: target?.id ?? null, pitch, velocity, down: recording ? engine.heardSteps() : null });
+  held.set(key, { channelId, patternId: target?.id ?? null, pitch, velocity, down: target ? recordPosition(target) : null });
   rollEditor.press(pitch, true);
 }
 
@@ -459,20 +483,39 @@ function noteUp(key: string) {
   engine.noteOff(note.channelId, note.pitch);
   rollEditor.press(note.pitch, false);
   const up = engine.heardSteps();
-  // Notes played during most of the count-in are ignored; ones just before
-  // the downbeat snap onto it.
-  if (note.down === null || up === null || note.down < -0.5 || !note.patternId || !inRollRange(note.pitch)) return;
+  if (note.down === null || up === null || !note.patternId || !inRollRange(note.pitch)) return;
   const pat = findPattern(project(), note.patternId);
   if (!pat) return;
   const n = recordedNote({
-    downSteps: Math.max(0, note.down),
-    upSteps: up,
+    downSteps: note.down.local,
+    upSteps: note.down.local + Math.max(0, up - note.down.heard),
     pitch: note.pitch,
     velocity: note.velocity,
     grid: store.get().prefs.quantize,
     totalSteps: patternSteps(pat, project().timeSig),
   });
   edit((p) => addNote(p, note.patternId!, n), take, Infinity);
+}
+
+/**
+ * Where a key press lands inside the melody being recorded, or null if it is
+ * not being recorded. In Pattern mode the melody loops (with any backing); in
+ * Song mode the note goes into whichever clip of the melody is playing.
+ */
+function recordPosition(target: MelodyPattern): { local: number; heard: number } | null {
+  const s = store.get();
+  if (!s.recordArmed || !running() || s.current !== target.id) return null;
+  const raw = engine.heardSteps();
+  // Notes played during most of the count-in are ignored; ones just before
+  // the downbeat snap onto it.
+  if (raw === null || raw < -0.5) return null;
+  const heard = Math.max(0, raw);
+  const length = patternSteps(target, s.project.timeSig);
+  if (s.mode === "pattern") return { local: positionInPattern(heard, engine.loopSteps(), length), heard };
+  if (s.prefs.recordWith !== "song") return null;
+  const songStep = positionInPattern(heard, engine.loopSteps(), Infinity);
+  const at = clipAt(s.project, target.id, Math.floor(songStep));
+  return at ? { local: at.local + (songStep - Math.floor(songStep)), heard } : null;
 }
 
 function releaseAllKeys() {
@@ -698,16 +741,43 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") autosave.flush(project());
 });
 
+/**
+ * Tell the engine what to play. While recording with backing, the melody
+ * loops together with the chosen patterns, and everything except the
+ * recorded channel plays at the backing volume.
+ */
+let sourceKey = "";
+let backingKey = "";
+function syncEngineSource(s: AppState) {
+  const target = recordTarget(s);
+  const recordingHere = s.recordArmed && !!target && s.current === target.id;
+  const layers =
+    recordingHere && s.mode === "pattern" && s.prefs.recordWith === "backing"
+      ? (s.backing ?? playsAlongside(s.project, target!.id)).filter((id) => id !== target!.id)
+      : [];
+  const key = `${s.mode}|${s.current}|${layers.join()}`;
+  if (key !== sourceKey) {
+    sourceKey = key;
+    engine.setSource(s.mode, s.current, layers);
+  }
+  const duck = recordingHere && s.prefs.recordWith !== "alone" ? `${target!.channelId}|${s.prefs.backingLevel}` : "";
+  if (duck !== backingKey) {
+    backingKey = duck;
+    engine.setBacking(duck ? target!.channelId : null, s.prefs.backingLevel);
+  }
+}
+
 store.subscribe((s, prev) => {
   if (s.project !== prev.project) {
     engine.setProject(s.project);
     autosave(s.project);
   }
-  if (s.mode !== prev.mode || s.current !== prev.current) engine.setSource(s.mode, s.current);
+  syncEngineSource(s);
   if (s.playState !== prev.playState && s.playState === "stopped") take = `take-${++takeCount}`;
   render();
 });
 render();
+syncEngineSource(store.get());
 
 /* ---------- Keyboard: FL Studio shortcuts ---------- */
 
