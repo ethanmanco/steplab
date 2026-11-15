@@ -15,6 +15,7 @@ A small beat maker that runs in the browser, built around the core of FL Studio:
 - **Editor windows:** double-click a clip and its editor opens in a window over the playlist, like FL Studio. Drum loops open in a step sequencer: click a step, or drag across steps to paint or erase. Melodies open in a four octave piano roll: click to place a note, drag right to make it longer, click a note to delete it, stack notes for chords. Drag windows by their title bar and resize them from the corner.
 - **Pattern and Song modes:** **PAT** loops just the selected pattern while you work on it. **SONG** plays the whole playlist from left to right. Click the playlist ruler to jump to a bar.
 - **Record:** play notes on a MIDI keyboard or your computer keyboard while the music plays. Notes land in the open melody where you played them, snapped to 1/16, 1/8 or 1/4 notes, with the length you held them. A one bar count-in and a metronome help you come in on time.
+- **Hear the music while you record:** choose what plays under you. **Just this** loops the melody alone. **Backing** loops it together with the patterns you tick (it starts with whatever plays alongside the melody in your song, such as the beat and the bass line). **Song** plays the whole playlist from the playhead, and your notes go into the melody wherever its clips are. A **Backing volume** slider turns everything else down so you can hear yourself.
 - **Any meter:** type in the tempo (60 to 180 BPM) and the time signature (any number of beats over 4 or 8, such as 3/4, 6/8 or 7/8). Patterns can be up to 16 bars of 4/4 and songs up to 128.
 - **Feel:** swing pushes every second sixteenth late, up to a triplet shuffle.
 - **Layout:** **Auto** sizes the sidebar to fit and shrink-wraps editor windows to what they show. **Manual** lets you drag the divider between the sidebar and the playlist, the playlist's bottom edge, and the corner of each window. Dragging the divider switches to Manual; double-clicking it goes back to Auto.
@@ -29,7 +30,7 @@ A small beat maker that runs in the browser, built around the core of FL Studio:
 2. Press **Play** to hear the starter song. Double-click any clip to open it.
 3. Press **New drum loop** or **New melody**. The pattern is placed on the playlist and its editor opens. Fill it in; with **PAT** selected it loops on its own while you work.
 4. Arrange: click a pattern in the list, then click empty spots in the playlist to place it. Drag clips around and stretch them. Switch to **SONG** to hear it all.
-5. To record a melody, open it, press **Rec**, then **Play**. After the count-in, play notes with your MIDI keyboard (press **Connect MIDI** first) or your computer keyboard. Press **Ctrl+Z** to undo a take you did not like.
+5. To record a melody, open it and pick what you want to hear under **Hear while recording**. Press **Rec**, then **Play**. After the count-in, play notes with your MIDI keyboard (press **Connect MIDI** first) or your computer keyboard. Press **Ctrl+Z** to undo a take you did not like.
 6. **Save** downloads your song. **WAV** downloads the audio.
 
 ### Keyboard
@@ -82,6 +83,8 @@ Timing is the part that makes or breaks a sequencer. JavaScript timers drift and
 
 Recording has the opposite problem: the music you hear is already a moment old. When a key goes down, the engine works out where the music is **as heard** (the audio clock minus the output latency) and stores that position in steps. When the key comes up it does the same, so the note gets its real length, even across the loop end. The start then snaps to the chosen grid. Live notes play straight through the track's synth so you hear yourself with no extra delay.
 
+The backing is handled in the scheduler too. With **Backing**, Pattern mode plays the melody and the chosen patterns together and loops over the longest of them; shorter ones repeat inside it, and `positionInPattern` maps what you heard back onto the melody. With **Song**, the playlist plays as usual and each note is placed by finding the melody's clip under the playhead (`clipAt`). The backing volume scales every channel strip except the one you are playing.
+
 ### WAV export
 
 The export builds the exact same audio graph (one voice and channel strip per channel) inside Tone's offline context and renders it faster than real time. The song or pattern is rendered **twice** and only the second pass is kept: it already contains the tails (pad releases, open hats) that spill over from the end of the first pass, just like when it repeats live. The result is a seamless loop. A small encoder writes 16-bit stereo PCM at 44.1 kHz.
@@ -95,7 +98,7 @@ Projects are versioned JSON tagged with `"app": "steplab"`. Opening a file repai
 - Real buttons, labels, roving focus, visible focus rings and a status message for each action.
 - `prefers-reduced-motion` turns off every transition and the blinking record light.
 - On small screens the sidebar sits above the playlist, editor windows fill the screen, grids scroll sideways with their names pinned, and touch targets are at least 40 px. Tapping toggles or selects; dragging scrolls. Clips move with the toolbar buttons instead of dragging.
-- A dark deep-space theme: a still, seeded starfield painted once on a canvas, with soft nebula light behind the panels. Nothing in the background moves.
+- A deep-space theme: two seeded star layers painted once on canvases and drifting very slowly at different speeds, a faint galaxy band, colored nebula light, a ringed planet rising in the corner and a few stars that twinkle, all behind frosted glass panels. With reduced motion turned on, the sky holds still.
 
 ## Project layout
 
