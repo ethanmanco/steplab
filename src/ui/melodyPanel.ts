@@ -293,7 +293,7 @@ export function createMelodyPanel(getState: () => AppState, actions: MelodyActio
       const center = `${a}:${m.synth}`;
       if (centeredFor !== center) {
         centeredFor = center;
-        requestAnimationFrame(() => centerPitch(SYNTHS[m.synth].home));
+        centerPitch(SYNTHS[m.synth].home);
       }
       if (
         shown &&

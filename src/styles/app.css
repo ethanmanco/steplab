@@ -522,6 +522,8 @@ input[type="range"] {
 /* ---------- Step grids ---------- */
 
 .scroller {
+  /* Positioned so cell offsets are measured from the scroll box itself. */
+  position: relative;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   padding: 2px 16px 8px 0;
