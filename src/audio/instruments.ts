@@ -1,6 +1,8 @@
 import * as Tone from "tone";
 import { midiToFreq } from "../core/notes";
 import type { SynthId, ToneShape } from "../core/types";
+import type { LightOscillator } from "./layers";
+import { LightPoly, type LightEnvelope } from "./voices";
 
 /** A playable melody voice. Most are polyphonic, so a step can hold a chord. */
 export interface Instrument {
@@ -26,19 +28,25 @@ interface Shape {
   release: number;
 }
 
-/** The low-pass filter at the end of every instrument, driven by the cutoff and resonance knobs. */
-function shaper(): Tone.Filter {
-  return new Tone.Filter({ type: "lowpass", frequency: 20000, Q: 0.5, rolloff: -12 });
+/**
+ * The low-pass filter at the end of every instrument, driven by the cutoff and
+ * resonance knobs. Filters here are Tone's BiquadFilter: the same browser
+ * filter as Tone.Filter, without the always-running signal nodes Tone.Filter
+ * adds to drive its settings.
+ */
+function shaper(): Tone.BiquadFilter {
+  return new Tone.BiquadFilter({ type: "lowpass", frequency: 20000, Q: 0.5 });
 }
 
-function applyFilter(f: Tone.Filter, t: ToneShape) {
+function applyFilter(f: Tone.BiquadFilter, t: ToneShape) {
   f.frequency.rampTo(cutoffHz(t.cutoff), 0.03);
   f.Q.rampTo(0.5 + t.resonance * 14, 0.03);
 }
 
-function wrap(synth: Tone.PolySynth, base: Shape, chain: Tone.ToneAudioNode[] = []): Instrument {
+function wrap(synth: Tone.PolySynth | LightPoly, base: Shape, chain: Tone.ToneAudioNode[] = []): Instrument {
   const tone = shaper();
-  const nodes = [synth, ...chain, tone];
+  const nodes = [...chain, tone];
+  synth.connect(nodes[0]!);
   for (let i = 0; i < nodes.length - 1; i++) nodes[i]!.connect(nodes[i + 1]!);
   return {
     output: tone,
@@ -53,7 +61,10 @@ function wrap(synth: Tone.PolySynth, base: Shape, chain: Tone.ToneAudioNode[] = 
         portamento: t.glide * 0.3,
       } as never);
     },
-    dispose: () => nodes.forEach((n) => n.dispose()),
+    dispose: () => {
+      synth.dispose();
+      nodes.forEach((n) => n.dispose());
+    },
   };
 }
 
@@ -71,6 +82,14 @@ function poly(
     );
 }
 
+/** Build a preset on the light voice: Tone Synth sounds made from plain oscillators, far cheaper to play. */
+function light(
+  options: { oscillator: LightOscillator; envelope: LightEnvelope; volume: number },
+  chain: () => Tone.ToneAudioNode[] = () => [],
+): () => Instrument {
+  return () => wrap(new LightPoly(options), { attack: options.envelope.attack, release: options.envelope.release }, chain());
+}
+
 /**
  * An 808 bass: one sine voice with a quick pitch drop for the knock at the
  * start, a long body, and a little saturation so it is heard on small
@@ -86,7 +105,7 @@ function bass808(): Instrument {
     volume: -1,
   });
   const drive = new Tone.Distortion({ distortion: 0.35, wet: 0.35 });
-  const filter = new Tone.Filter({ type: "lowpass", frequency: 1400, Q: 0.5 });
+  const filter = new Tone.BiquadFilter({ type: "lowpass", frequency: 1400, Q: 0.5 });
   const tone = shaper();
   synth.chain(drive, filter, tone);
   let held: number | null = null;
@@ -112,15 +131,13 @@ function bass808(): Instrument {
   };
 }
 
-const lowpass = (frequency: number, Q = 0.7) => () => [new Tone.Filter({ type: "lowpass", frequency, Q })];
+const lowpass = (frequency: number, Q = 0.7) => () => [new Tone.BiquadFilter({ type: "lowpass", frequency, Q })];
 
 const builders: Record<SynthId, () => Instrument> = {
   b808: bass808,
 
   // Detuned saws through a low-pass filter: bright but not harsh.
-  lead: poly(
-    Tone.Synth,
-    {
+  lead: light({
       oscillator: { type: "fatsawtooth", count: 3, spread: 18 },
       envelope: { attack: 0.005, decay: 0.15, sustain: 0.5, release: 0.12 },
       volume: -14,
@@ -149,9 +166,7 @@ const builders: Record<SynthId, () => Instrument> = {
   }),
 
   // Slow attack and long release, filtered soft.
-  pad: poly(
-    Tone.Synth,
-    {
+  pad: light({
       oscillator: { type: "fatsawtooth", count: 3, spread: 30 },
       envelope: { attack: 0.16, decay: 0.3, sustain: 0.7, release: 0.9 },
       volume: -18,
@@ -171,9 +186,7 @@ const builders: Record<SynthId, () => Instrument> = {
   }),
 
   // A plucked string body: falling harmonics with a quick decay and no sustain.
-  piano: poly(
-    Tone.Synth,
-    {
+  piano: light({
       oscillator: { type: "custom", partials: [1, 0.55, 0.32, 0.22, 0.14, 0.09, 0.05, 0.03] },
       envelope: { attack: 0.002, decay: 2.2, sustain: 0, release: 0.7 },
       volume: -18,
@@ -182,9 +195,7 @@ const builders: Record<SynthId, () => Instrument> = {
   ),
 
   // Many detuned saws that swell in: a string section.
-  strings: poly(
-    Tone.Synth,
-    {
+  strings: light({
       oscillator: { type: "fatsawtooth", count: 5, spread: 24 },
       envelope: { attack: 0.35, decay: 0.3, sustain: 0.85, release: 1.2 },
       volume: -20,
@@ -213,16 +224,14 @@ const builders: Record<SynthId, () => Instrument> = {
   }),
 
   // Drawbar-style harmonics that sustain while held.
-  organ: poly(Tone.Synth, {
+  organ: light({
     oscillator: { type: "custom", partials: [1, 1, 0.6, 0, 0.5, 0, 0.3, 0.25] },
     envelope: { attack: 0.005, decay: 0.1, sustain: 1, release: 0.08 },
     volume: -18,
   }),
 
   // Seven wide-detuned saws: the big trance and K-pop chorus lead.
-  supersaw: poly(
-    Tone.Synth,
-    {
+  supersaw: light({
       oscillator: { type: "fatsawtooth", count: 7, spread: 45 },
       envelope: { attack: 0.01, decay: 0.2, sustain: 0.8, release: 0.4 },
       volume: -21,
@@ -242,27 +251,23 @@ const builders: Record<SynthId, () => Instrument> = {
   }),
 
   // A soft triangle with a gentle swell and vibrato.
-  flute: poly(
-    Tone.Synth,
-    {
+  flute: light({
       oscillator: { type: "triangle" },
       envelope: { attack: 0.08, decay: 0.1, sustain: 0.9, release: 0.25 },
       volume: -18,
     },
-    () => [new Tone.Vibrato({ frequency: 5, depth: 0.08 }), new Tone.Filter({ type: "lowpass", frequency: 2600 })],
+    () => [new Tone.Vibrato({ frequency: 5, depth: 0.08 }), new Tone.BiquadFilter({ type: "lowpass", frequency: 2600 })],
   ),
 
   // A pure sine low end.
-  sub: poly(Tone.Synth, {
+  sub: light({
     oscillator: { type: "sine" },
     envelope: { attack: 0.005, decay: 0.2, sustain: 0.9, release: 0.15 },
     volume: -6,
   }),
 
   // Two detuned saws, filtered dark: the drum and bass "reese".
-  reese: poly(
-    Tone.Synth,
-    {
+  reese: light({
       oscillator: { type: "fatsawtooth", count: 2, spread: 30 },
       envelope: { attack: 0.01, decay: 0.1, sustain: 1, release: 0.2 },
       volume: -12,

@@ -18,6 +18,11 @@ import { createInstrument, cutoffHz, envelopeScale, type Instrument } from "./in
  * The reverb and delay are shared returns that feed the master, which ends in
  * a limiter. The graph knows nothing about the transport, so the live engine
  * and the offline WAV render build the same graph and feed it the same events.
+ *
+ * Everything here runs on the audio thread for every sample, so it is kept
+ * lean: filters are Tone's BiquadFilter (Tone.Filter adds four always-running
+ * signal nodes to each one), and the reverb only exists while a channel sends
+ * to it.
  */
 export interface Graph {
   play(project: Project, events: StepEvents, step: number, time: number): void;
@@ -37,6 +42,8 @@ export type SampleSource = (id: string) => AudioBuffer | undefined;
 const NOTE_FILL = 0.92;
 const CHOKES: Partial<Record<string, string>> = { chat: "ohat", hat808: "ohat808" };
 const DELAY_BEATS: Record<DelayTime, number> = { "16n": 0.25, "8n": 0.5, "8n.": 0.75, "4n": 1 };
+/** How long the reverb lingers after the last send is turned off, so its tail is not cut. */
+const REVERB_TAIL_MS = 8000;
 
 /** Send amounts are faders too: 0 is off, 1 is full level. */
 const sendGain = (amount: number) => (amount <= 0 ? 0 : amount * amount);
@@ -44,10 +51,10 @@ const sendGain = (amount: number) => (amount <= 0 ? 0 : amount * amount);
 interface Slot {
   key: string;
   sound: Channel["sound"];
-  filter: Tone.Filter;
-  eqLow: Tone.Filter;
-  eqMid: Tone.Filter;
-  eqHigh: Tone.Filter;
+  filter: Tone.BiquadFilter;
+  eqLow: Tone.BiquadFilter;
+  eqMid: Tone.BiquadFilter;
+  eqHigh: Tone.BiquadFilter;
   comp: Tone.Compressor;
   makeup: Tone.Gain;
   strip: Tone.Channel;
@@ -90,9 +97,16 @@ function sampleDrum(buffer: AudioBuffer): DrumVoice {
 }
 
 export function createGraph(project: Project, samples: SampleSource = () => undefined): Graph {
+  const context = Tone.getContext();
   const limiter = new Tone.Limiter(-1).toDestination();
   const master = new Tone.Gain(0.85).connect(limiter);
-  const reverb = new Tone.Freeverb({ roomSize: 0.84, dampening: 4500, wet: 1 }).connect(master);
+  // Freeverb is eight comb filters running per sample, the heaviest part of
+  // the mixer, so it is made when a channel first sends to it and freed once
+  // none does. Sends always feed this bus.
+  const reverbBus = new Tone.Gain(1);
+  let reverb: Tone.Freeverb | null = null;
+  let reverbRoom = 0.84;
+  let reverbIdle: number | undefined;
   const delay = new Tone.FeedbackDelay({ delayTime: 0.375, feedback: 0.35, wet: 1 }).connect(master);
   const slots = new Map<string, Slot>();
   let backing: { keep: string; level: number } | null = null;
@@ -131,15 +145,15 @@ export function createGraph(project: Project, samples: SampleSource = () => unde
   }
 
   function newSlot(): Slot {
-    const filter = new Tone.Filter({ type: "lowpass", frequency: 20000, Q: 0.5, rolloff: -12 });
+    const filter = new Tone.BiquadFilter({ type: "lowpass", frequency: 20000, Q: 0.5 });
     // Three shelving and peaking bands: exactly flat at 0 dB, unlike a crossover EQ.
-    const eqLow = new Tone.Filter({ type: "lowshelf", frequency: 250, gain: 0 });
-    const eqMid = new Tone.Filter({ type: "peaking", frequency: 1200, Q: 0.8, gain: 0 });
-    const eqHigh = new Tone.Filter({ type: "highshelf", frequency: 4500, gain: 0 });
+    const eqLow = new Tone.BiquadFilter({ type: "lowshelf", frequency: 250, gain: 0 });
+    const eqMid = new Tone.BiquadFilter({ type: "peaking", frequency: 1200, Q: 0.8, gain: 0 });
+    const eqHigh = new Tone.BiquadFilter({ type: "highshelf", frequency: 4500, gain: 0 });
     const comp = new Tone.Compressor({ threshold: 0, ratio: 1, attack: 0.01, release: 0.2 });
     const makeup = new Tone.Gain(1);
     const strip = new Tone.Channel();
-    const reverbSend = new Tone.Gain(0).connect(reverb);
+    const reverbSend = new Tone.Gain(0).connect(reverbBus);
     const delaySend = new Tone.Gain(0).connect(delay);
     filter.chain(eqLow, eqMid, eqHigh, comp, makeup, strip);
     strip.connect(master);
@@ -176,6 +190,24 @@ export function createGraph(project: Project, samples: SampleSource = () => unde
     slot.filter.Q.rampTo(filterOn ? 0.5 + ch.tone.resonance * 14 : 0.5, 0.03);
     slot.synth?.setTone(ch.tone);
     slot.octave = ch.kind === "synth" ? ch.tone.octave : 0;
+  }
+
+  /** Make the reverb when some channel sends to it; free it a tail's length after the last one stops. */
+  function needReverb(on: boolean) {
+    if (on) {
+      window.clearTimeout(reverbIdle);
+      reverbIdle = undefined;
+      if (!reverb) {
+        reverb = new Tone.Freeverb({ context, roomSize: reverbRoom, dampening: 4500, wet: 1 }).connect(master);
+        reverbBus.connect(reverb);
+      }
+    } else if (reverb && reverbIdle === undefined) {
+      reverbIdle = window.setTimeout(() => {
+        reverbIdle = undefined;
+        reverb?.dispose();
+        reverb = null;
+      }, REVERB_TAIL_MS);
+    }
   }
 
   const graph: Graph = {
@@ -231,7 +263,9 @@ export function createGraph(project: Project, samples: SampleSource = () => unde
       // Master strip and the shared returns.
       master.gain.rampTo(p.master.volume, 0.02);
       // 0.7 is a small room; 0.97 a long hall.
-      reverb.roomSize.value = 0.7 + p.master.reverbSize * 0.27;
+      reverbRoom = 0.7 + p.master.reverbSize * 0.27;
+      needReverb(p.channels.some((ch) => ch.fx.reverb > 0));
+      if (reverb) reverb.roomSize.value = reverbRoom;
       delay.delayTime.rampTo((60 / p.bpm) * DELAY_BEATS[p.master.delayTime], 0.05);
       delay.feedback.rampTo(p.master.delayFeedback, 0.05);
     },
@@ -244,7 +278,10 @@ export function createGraph(project: Project, samples: SampleSource = () => unde
     dispose() {
       slots.forEach(disposeSlot);
       slots.clear();
-      [reverb, delay, master, limiter].forEach((n) => n.dispose());
+      window.clearTimeout(reverbIdle);
+      reverb?.dispose();
+      reverb = null;
+      [reverbBus, delay, master, limiter].forEach((n) => n.dispose());
     },
   };
   graph.sync(project);

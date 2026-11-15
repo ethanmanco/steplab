@@ -49,7 +49,7 @@ function snare(): DrumVoice {
     envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.05 },
     volume: -6,
   });
-  const filter = new Tone.Filter({ type: "highpass", frequency: 1800 });
+  const filter = new Tone.BiquadFilter({ type: "highpass", frequency: 1800 });
   const noise = new Tone.NoiseSynth({
     noise: { type: "white" },
     envelope: { attack: 0.001, decay: 0.17, sustain: 0 },
@@ -69,7 +69,7 @@ function snare(): DrumVoice {
 }
 
 function hat(decay: number): { voice: DrumVoice; synth: Tone.MetalSynth } {
-  const filter = new Tone.Filter({ type: "highpass", frequency: 7000 });
+  const filter = new Tone.BiquadFilter({ type: "highpass", frequency: 7000 });
   const synth = new Tone.MetalSynth({
     harmonicity: 5.1,
     modulationIndex: 32,
@@ -90,7 +90,7 @@ function hat(decay: number): { voice: DrumVoice; synth: Tone.MetalSynth } {
 }
 
 function clap(): DrumVoice {
-  const filter = new Tone.Filter({ type: "bandpass", frequency: 1300, Q: 1.2 });
+  const filter = new Tone.BiquadFilter({ type: "bandpass", frequency: 1300, Q: 1.2 });
   const bursts = new Tone.NoiseSynth({
     noise: { type: "white" },
     envelope: { attack: 0.001, decay: 0.012, sustain: 0 },

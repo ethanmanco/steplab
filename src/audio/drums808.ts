@@ -39,7 +39,7 @@ export function snare808(): DrumVoice {
     envelope: { attack: 0.001, decay: 0.07, sustain: 0, release: 0.02 },
     volume: -12,
   }).connect(out);
-  const filter = new Tone.Filter({ type: "highpass", frequency: 1800 }).connect(out);
+  const filter = new Tone.BiquadFilter({ type: "highpass", frequency: 1800 }).connect(out);
   const snap = new Tone.NoiseSynth({
     noise: { type: "white" },
     envelope: { attack: 0.001, decay: 0.2, sustain: 0 },
@@ -57,7 +57,7 @@ export function snare808(): DrumVoice {
 }
 
 function hat808(decay: number): DrumVoice {
-  const filter = new Tone.Filter({ type: "highpass", frequency: 7500 });
+  const filter = new Tone.BiquadFilter({ type: "highpass", frequency: 7500 });
   const metal = new Tone.MetalSynth({
     harmonicity: 5.1,
     modulationIndex: 40,
@@ -78,7 +78,7 @@ export const closedHat808 = () => hat808(0.035);
 export const openHat808 = () => hat808(0.55);
 
 export function clap808(): DrumVoice {
-  const filter = new Tone.Filter({ type: "bandpass", frequency: 1000, Q: 2 });
+  const filter = new Tone.BiquadFilter({ type: "bandpass", frequency: 1000, Q: 2 });
   const out = new Tone.Gain(1.8);
   filter.connect(out);
   const bursts = new Tone.NoiseSynth({
@@ -117,7 +117,7 @@ export function tom808(): DrumVoice {
 
 /** Two short, high tones through a high-pass filter: the 808 rimshot click. */
 export function rim808(): DrumVoice {
-  const filter = new Tone.Filter({ type: "highpass", frequency: 300 });
+  const filter = new Tone.BiquadFilter({ type: "highpass", frequency: 300 });
   const opts = { oscillator: { type: "triangle" as const }, envelope: { attack: 0.001, decay: 0.025, sustain: 0, release: 0.01 } };
   const a = new Tone.Synth({ ...opts, volume: -4 }).connect(filter);
   const b = new Tone.Synth({ ...opts, volume: -8 }).connect(filter);
@@ -133,7 +133,7 @@ export function rim808(): DrumVoice {
 
 /** Two square waves at 540 and 800 Hz through a band-pass filter, like the original circuit. */
 export function cowbell808(): DrumVoice {
-  const filter = new Tone.Filter({ type: "bandpass", frequency: 800, Q: 0.8 });
+  const filter = new Tone.BiquadFilter({ type: "bandpass", frequency: 800, Q: 0.8 });
   const out = new Tone.Gain(1.2);
   filter.connect(out);
   const opts = { oscillator: { type: "square" as const }, envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.05 } };
