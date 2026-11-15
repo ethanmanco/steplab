@@ -25,6 +25,7 @@ A small beat maker that runs in the browser, built around the core of FL Studio:
 - **Feel:** swing pushes every second sixteenth late, up to a triplet shuffle.
 - **Layout:** **Auto** sizes the sidebar to fit and shrink-wraps editor windows to what they show. **Manual** lets you drag the divider between the sidebar and the playlist, the playlist's bottom edge, and the corner of each window. Dragging the divider switches to Manual; double-clicking it goes back to Auto.
 - **FL Studio shortcuts:** Space, R, L, Alt-drag, Ctrl+B and the rest work the way FL users expect. Press F1 for the list.
+- **Example songs:** the **Examples** button loads a starter beat, a K-pop chorus, a lo-fi study track, trap and house, any time. Loading one can be undone, so your own song is never lost.
 - **Undo and redo** for every change. A whole recording take undoes in one step.
 - **Save:** your song autosaves in the browser. Save and Open move it in and out as a JSON file. Files from earlier versions open as a song with their loop already placed.
 - **Export:** WAV renders the song, or just the current pattern in PAT mode, to a file that loops seamlessly in other music apps.
