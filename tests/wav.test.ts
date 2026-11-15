@@ -53,7 +53,7 @@ describe("loopSlice", () => {
 
   it("gives exactly one loop of frames for any tempo", () => {
     for (const bpm of [60, 97, 120, 180]) {
-      const secs = loopSeconds(bpm, 2);
+      const secs = loopSeconds(bpm, 2, { beats: 7, unit: 8 });
       const { start, end } = loopSlice(secs, 48000);
       expect(end - start).toBe(Math.round(secs * 48000));
     }

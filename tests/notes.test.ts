@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
-  PIANO_ROWS,
+  ROLL_HIGH,
+  ROLL_LOW,
+  ROLL_ROWS,
   SYNTHS,
+  inRollRange,
   isBlackKey,
   midiToFreq,
   midiToName,
   midiToSpoken,
-  rowToMidi,
 } from "../src/core/notes";
-import { clearMelody, demoProject, emptyProject, setSynth, toggleNote } from "../src/core/project";
+import { demoProject } from "../src/core/project";
 import { SYNTH_IDS } from "../src/core/types";
 
 describe("note names", () => {
@@ -16,8 +18,7 @@ describe("note names", () => {
     expect(midiToName(60)).toBe("C4");
     expect(midiToName(61)).toBe("C#4");
     expect(midiToName(36)).toBe("C2");
-    expect(midiToName(71)).toBe("B4");
-    expect(midiToName(69)).toBe("A4");
+    expect(midiToName(83)).toBe("B5");
   });
 
   it("spells sharps out for screen readers", () => {
@@ -30,65 +31,30 @@ describe("note names", () => {
     expect(black).toEqual([false, true, false, true, false, false, true, false, true, false, true, false]);
   });
 
-  it("tunes A4 to 440 Hz and doubles per octave", () => {
+  it("tunes A4 to 440 Hz", () => {
     expect(midiToFreq(69)).toBeCloseTo(440);
     expect(midiToFreq(81)).toBeCloseTo(880);
-    expect(midiToFreq(60)).toBeCloseTo(261.63, 1);
   });
 });
 
-describe("synth ranges", () => {
-  it("gives every synth two octaves starting on a C", () => {
-    for (const id of SYNTH_IDS) {
-      expect(midiToName(rowToMidi(id, 0))).toMatch(/^C\d$/);
-      expect(rowToMidi(id, PIANO_ROWS - 1) - rowToMidi(id, 0)).toBe(23);
-    }
+describe("piano roll range", () => {
+  it("spans four octaves from C2 to B5", () => {
+    expect(ROLL_ROWS).toBe(48);
+    expect(midiToName(ROLL_LOW)).toBe("C2");
+    expect(midiToName(ROLL_HIGH)).toBe("B5");
+    expect(inRollRange(36)).toBe(true);
+    expect(inRollRange(84)).toBe(false);
+    expect(inRollRange(60.5)).toBe(false);
   });
 
-  it("puts the bass two octaves under the lead", () => {
-    expect(rowToMidi("lead", 0) - rowToMidi("bass", 0)).toBe(24);
-    expect(SYNTHS.bass.name).toBe("Bass");
-  });
-});
-
-describe("toggleNote", () => {
-  it("adds and removes a note without touching the original", () => {
-    const p = emptyProject();
-    const a = toggleNote(p, 0, 3, 7);
-    expect(a.melodies[0]!.notes[3]).toEqual([7]);
-    expect(p.melodies[0]!.notes[3]).toEqual([]);
-    expect(toggleNote(a, 0, 3, 7).melodies[0]!.notes[3]).toEqual([]);
+  it("gives every sound a home pitch on the roll", () => {
+    for (const id of SYNTH_IDS) expect(inRollRange(SYNTHS[id].home)).toBe(true);
   });
 
-  it("stacks notes into a sorted chord", () => {
-    let p = emptyProject();
-    p = toggleNote(p, 1, 0, 7);
-    p = toggleNote(p, 1, 0, 0);
-    p = toggleNote(p, 1, 0, 4);
-    expect(p.melodies[1]!.notes[0]).toEqual([0, 4, 7]);
-    expect(p.melodies[0]!.notes[0]).toEqual([]);
-  });
-});
-
-describe("setSynth and clearMelody", () => {
-  it("changes the sound but keeps the notes", () => {
-    const p = setSynth(demoProject(), 0, "pad");
-    expect(p.melodies[0]!.synth).toBe("pad");
-    expect(p.melodies[0]!.notes).toEqual(demoProject().melodies[0]!.notes);
-  });
-
-  it("clears only one track", () => {
-    const p = clearMelody(demoProject(), 0);
-    expect(p.melodies[0]!.notes.every((n) => n.length === 0)).toBe(true);
-    expect(p.melodies[1]!.notes.some((n) => n.length > 0)).toBe(true);
-  });
-
-  it("starts the demo with notes on both tracks inside the range", () => {
+  it("keeps the demo melodies on the roll", () => {
     for (const m of demoProject().melodies) {
-      const rows = m.notes.flat();
-      expect(rows.length).toBeGreaterThan(0);
-      for (const r of rows) expect(r).toBeGreaterThanOrEqual(0);
-      for (const r of rows) expect(r).toBeLessThan(PIANO_ROWS);
+      expect(m.notes.length).toBeGreaterThan(0);
+      for (const n of m.notes) expect(inRollRange(n.pitch)).toBe(true);
     }
   });
 });

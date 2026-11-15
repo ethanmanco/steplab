@@ -1,6 +1,5 @@
-import { SYNTHS, rowToMidi } from "./notes";
 import { loopSteps } from "./timing";
-import type { DrumId, LoopBars, MelodyTrack, Project, SynthId } from "./types";
+import type { DrumId, MelodyTrack, Note, Project, SynthId, TrackMix } from "./types";
 
 export interface DrumHit {
   track: number;
@@ -8,8 +7,8 @@ export interface DrumHit {
 }
 
 export interface NoteHit {
-  row: number;
-  midi: number;
+  pitch: number;
+  velocity: number;
   /** How many steps the note should ring. */
   steps: number;
 }
@@ -26,41 +25,51 @@ export interface StepEvents {
 }
 
 /**
- * How long a note rings: the synth's gate length, cut short if the same
- * pitch starts again sooner (looking around the loop end). Retriggering a
- * pitch that is still ringing would otherwise make it stutter.
+ * Whether a track should be heard. Solo works like a mixer: once any track
+ * is soloed, only soloed tracks play. Mute always wins.
  */
-export function noteSteps(track: MelodyTrack, step: number, row: number, bars: LoopBars): number {
-  const gate = SYNTHS[track.synth].gate;
-  const n = loopSteps(bars);
-  for (let d = 1; d < gate; d++) {
-    if (track.notes[(step + d) % n]?.includes(row)) return d;
+export function audibleTracks(project: Project): { drums: boolean[]; melodies: boolean[] } {
+  const all: TrackMix[] = [...project.drums, ...project.melodies];
+  const anySolo = all.some((t) => t.solo);
+  const audible = (t: TrackMix) => !t.muted && (!anySolo || t.solo);
+  return { drums: project.drums.map(audible), melodies: project.melodies.map(audible) };
+}
+
+/**
+ * How long a note actually rings: its own length, cut short if the same
+ * pitch starts again sooner (looking around the loop end), so a repeated
+ * pitch never cuts itself off mid-attack.
+ */
+export function playLength(track: MelodyTrack, n: Note, totalSteps: number): number {
+  let length = n.length;
+  for (const o of track.notes) {
+    if (o === n || o.pitch !== n.pitch || o.step >= totalSteps) continue;
+    const gap = (o.step - n.step + totalSteps) % totalSteps;
+    if (gap > 0 && gap < length) length = gap;
   }
-  return gate;
+  return length;
 }
 
 /**
  * Everything that should sound on one loop step. Pure, so the audio
  * callback stays tiny and the logic can be tested without an AudioContext.
- * Muted tracks are skipped here as well as silenced in the mixer.
  */
 export function eventsAtStep(project: Project, step: number): StepEvents {
+  const audible = audibleTracks(project);
+  const total = loopSteps(project.bars, project.timeSig);
   const drums: DrumHit[] = [];
   project.drums.forEach((d, track) => {
-    if (!d.muted && d.steps[step]) drums.push({ track, id: d.id });
+    if (audible.drums[track] && d.steps.includes(step)) drums.push({ track, id: d.id });
   });
   const melodies: MelodyHit[] = [];
   project.melodies.forEach((m, track) => {
-    const rows = m.notes[step];
-    if (m.muted || !rows || rows.length === 0) return;
+    if (!audible.melodies[track]) return;
+    const starting = m.notes.filter((n) => n.step === step);
+    if (starting.length === 0) return;
     melodies.push({
       track,
       synth: m.synth,
-      notes: rows.map((row) => ({
-        row,
-        midi: rowToMidi(m.synth, row),
-        steps: noteSteps(m, step, row, project.bars),
-      })),
+      notes: starting.map((n) => ({ pitch: n.pitch, velocity: n.velocity, steps: playLength(m, n, total) })),
     });
   });
   return { drums, melodies };

@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { volumePercent, volumeToDb } from "../src/core/mix";
+import { parsePercent, volumePercent, volumeToDb } from "../src/core/mix";
+
+describe("parsePercent", () => {
+  it("reads typed percentages", () => {
+    expect(parsePercent("75")).toBe(0.75);
+    expect(parsePercent("75%")).toBe(0.75);
+    expect(parsePercent(" 42.5 % ")).toBeCloseTo(0.425);
+    expect(parsePercent("0")).toBe(0);
+  });
+
+  it("clamps to 0..100", () => {
+    expect(parsePercent("150")).toBe(1);
+    expect(parsePercent("-20")).toBe(0);
+  });
+
+  it("refuses anything that is not a number", () => {
+    for (const t of ["", "loud", "5x", "%", "1.2.3"]) expect(parsePercent(t)).toBeNull();
+  });
+});
 
 describe("volumeToDb", () => {
   it("is 0 dB at full volume and silent at zero", () => {

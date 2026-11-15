@@ -1,28 +1,24 @@
 import type { SynthId } from "./types";
 
-/** Two octaves of piano roll: row 0 is the lowest C, row 23 the B two octaves up. */
-export const PIANO_ROWS = 24;
+/** The piano roll spans four octaves, C2 up to B5. */
+export const ROLL_LOW = 36;
+export const ROLL_HIGH = 83;
+export const ROLL_ROWS = ROLL_HIGH - ROLL_LOW + 1;
 
 export interface SynthInfo {
   name: string;
-  /** MIDI note of piano-roll row 0. */
-  baseMidi: number;
-  /** How many steps a note rings for when nothing cuts it short. */
-  gate: number;
+  /** A comfortable pitch to scroll the roll to when this sound is chosen. */
+  home: number;
 }
 
 export const SYNTHS: Record<SynthId, SynthInfo> = {
-  lead: { name: "Lead", baseMidi: 60, gate: 1 },
-  bass: { name: "Bass", baseMidi: 36, gate: 1 },
-  pluck: { name: "Pluck", baseMidi: 60, gate: 2 },
-  pad: { name: "Pad", baseMidi: 48, gate: 4 },
+  lead: { name: "Lead", home: 67 },
+  bass: { name: "Bass", home: 43 },
+  pluck: { name: "Pluck", home: 67 },
+  pad: { name: "Pad", home: 60 },
 };
 
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
-
-export function rowToMidi(synth: SynthId, row: number): number {
-  return SYNTHS[synth].baseMidi + row;
-}
 
 function parts(midi: number): { pc: number; octave: number } {
   return { pc: ((midi % 12) + 12) % 12, octave: Math.floor(midi / 12) - 1 };
@@ -45,4 +41,8 @@ export function isBlackKey(midi: number): boolean {
 
 export function midiToFreq(midi: number): number {
   return 440 * 2 ** ((midi - 69) / 12);
+}
+
+export function inRollRange(pitch: number): boolean {
+  return Number.isInteger(pitch) && pitch >= ROLL_LOW && pitch <= ROLL_HIGH;
 }

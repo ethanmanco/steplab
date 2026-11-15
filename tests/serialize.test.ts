@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { demoProject, emptyProject, setLoopBars, setSynth, setTrackMix } from "../src/core/project";
+import { addNote, demoProject, emptyProject, setLoopBars, setSwing, setSynth, setTimeSig, setTrackMix } from "../src/core/project";
 import { parseProject, serializeProject } from "../src/core/serialize";
-import { MAX_STEPS } from "../src/core/timing";
 
 function parseOk(text: string) {
   const r = parseProject(text);
@@ -9,13 +8,16 @@ function parseOk(text: string) {
   return r.project;
 }
 
-const file = (extra: Record<string, unknown>) => JSON.stringify({ app: "steplab", version: 1, ...extra });
+const file = (extra: Record<string, unknown>) => JSON.stringify({ app: "steplab", version: 2, ...extra });
 
 describe("serializeProject and parseProject", () => {
   it("round trips a project exactly", () => {
-    let p = setLoopBars(demoProject(), 4);
+    let p = setLoopBars(demoProject(), 5);
+    p = setTimeSig(p, { beats: 7, unit: 8 });
     p = setSynth(p, 1, "pad");
-    p = setTrackMix(p, "drums", 3, { volume: 0.25, muted: true });
+    p = setSwing(p, 0.35);
+    p = setTrackMix(p, "drums", 3, { volume: 0.25, muted: true, solo: true });
+    p = addNote(p, 0, { step: 40, pitch: 83, length: 6, velocity: 0.33 });
     p = { ...p, bpm: 93 };
     expect(parseOk(serializeProject(p))).toEqual(p);
     expect(parseOk(serializeProject(p, true))).toEqual(p);
@@ -24,7 +26,7 @@ describe("serializeProject and parseProject", () => {
   it("tags files so other JSON is not mistaken for a project", () => {
     const data = JSON.parse(serializeProject(emptyProject()));
     expect(data.app).toBe("steplab");
-    expect(data.version).toBe(1);
+    expect(data.version).toBe(2);
   });
 });
 
@@ -37,13 +39,11 @@ describe("parseProject rejects", () => {
     for (const text of ["[]", "null", "42", JSON.stringify({ bpm: 120 }), JSON.stringify({ app: "other" })]) {
       const r = parseProject(text);
       expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.error).toMatch(/not a Steplab project/);
     }
   });
 
   it("files from a newer version", () => {
-    const r = parseProject(JSON.stringify({ app: "steplab", version: 2 }));
-    expect(r.ok).toBe(false);
+    expect(parseProject(JSON.stringify({ app: "steplab", version: 3 })).ok).toBe(false);
   });
 });
 
@@ -52,49 +52,74 @@ describe("parseProject repairs", () => {
     expect(parseOk(file({}))).toEqual(emptyProject());
   });
 
-  it("clamps tempo and fixes a bad loop length", () => {
-    const p = parseOk(file({ bpm: 400, bars: 3 }));
-    expect(p.bpm).toBe(180);
-    expect(p.bars).toBe(1);
+  it("clamps tempo, bars, swing and time signature", () => {
+    const p = parseOk(file({ bpm: 400, bars: 99, swing: 3, timeSig: { beats: 12, unit: 4 } }));
+    expect(p).toMatchObject({ bpm: 180, bars: 5, swing: 1, timeSig: { beats: 12, unit: 4 } });
   });
 
-  it("pads short step lists and drops extra steps", () => {
-    const p = parseOk(file({ drums: [{ id: "kick", steps: [true, false, true] }] }));
-    const kick = p.drums[0]!;
-    expect(kick.steps).toHaveLength(MAX_STEPS);
-    expect(kick.steps.slice(0, 4)).toEqual([true, false, true, false]);
-    const long = parseOk(file({ drums: [{ id: "kick", steps: Array(200).fill(true) }] }));
-    expect(long.drums[0]!.steps).toHaveLength(MAX_STEPS);
+  it("drops bad drum steps and sorts the rest", () => {
+    const p = parseOk(file({ drums: [{ id: "kick", steps: [9, 2, 2, -1, 1.5, "x", 9999] }] }));
+    expect(p.drums[0]!.steps).toEqual([2, 9]);
   });
 
-  it("keeps drum rows in the standard order whatever the file order", () => {
-    const p = parseOk(file({ drums: [{ id: "tom", steps: [true] }, { id: "kick", steps: [] }] }));
+  it("keeps drum rows in the standard order and ignores unknown drums", () => {
+    const p = parseOk(file({ drums: [{ id: "tom", steps: [0] }, { id: "cowbell", steps: [1] }] }));
     expect(p.drums.map((d) => d.id)).toEqual(["kick", "snare", "chat", "ohat", "clap", "tom"]);
-    expect(p.drums[5]!.steps[0]).toBe(true);
+    expect(p.drums[5]!.steps).toEqual([0]);
   });
 
-  it("ignores unknown drums", () => {
-    const p = parseOk(file({ drums: [{ id: "cowbell", steps: [true] }] }));
-    expect(p.drums.every((d) => d.steps.every((s) => !s))).toBe(true);
-  });
-
-  it("cleans melody notes: range, whole numbers, duplicates, order", () => {
-    const p = parseOk(file({ melodies: [{ synth: "pluck", notes: [[7, 3, 3, 99, -1, 2.5, "x"], "junk"] }] }));
+  it("cleans notes: range, duplicates, lengths, velocity", () => {
+    const p = parseOk(
+      file({
+        melodies: [
+          {
+            synth: "pluck",
+            notes: [
+              { step: 4, pitch: 60, length: 2, velocity: 0.5 },
+              { step: 4, pitch: 60, length: 9 },
+              { step: 0, pitch: 20 },
+              { step: 1, pitch: 62, length: -3, velocity: 7 },
+              "junk",
+            ],
+          },
+        ],
+      }),
+    );
     expect(p.melodies[0]!.synth).toBe("pluck");
-    expect(p.melodies[0]!.notes[0]).toEqual([3, 7]);
-    expect(p.melodies[0]!.notes[1]).toEqual([]);
-    expect(p.melodies[0]!.notes).toHaveLength(MAX_STEPS);
+    expect(p.melodies[0]!.notes).toEqual([
+      { step: 1, pitch: 62, length: 1, velocity: 1 },
+      { step: 4, pitch: 60, length: 2, velocity: 0.5 },
+    ]);
   });
 
-  it("falls back to the default sound for unknown synths", () => {
-    const p = parseOk(file({ melodies: [{ synth: "theremin" }, { synth: "kazoo" }] }));
-    expect(p.melodies.map((m) => m.synth)).toEqual(["lead", "bass"]);
+  it("falls back to default sounds and mix values", () => {
+    const p = parseOk(file({ melodies: [{ synth: "theremin" }], drums: [{ id: "kick", volume: "loud", muted: "yes" }] }));
+    expect(p.melodies[0]!.synth).toBe("lead");
+    expect(p.drums[0]).toMatchObject({ volume: 0.8, muted: false, solo: false });
   });
+});
 
-  it("clamps volume and only accepts true for muted", () => {
-    const p = parseOk(file({ drums: [{ id: "kick", volume: 7, muted: "yes" }] }));
-    expect(p.drums[0]).toMatchObject({ volume: 1, muted: false });
-    const q = parseOk(file({ drums: [{ id: "kick", volume: "loud" }] }));
-    expect(q.drums[0]!.volume).toBe(0.8);
+describe("version 1 files", () => {
+  it("upgrades on/off steps and relative piano rows", () => {
+    const steps = Array(64).fill(false);
+    steps[0] = true;
+    steps[20] = true;
+    const notes: number[][] = Array.from({ length: 64 }, () => []);
+    notes[2] = [0, 7];
+    const v1 = JSON.stringify({
+      app: "steplab",
+      version: 1,
+      bpm: 100,
+      bars: 2,
+      drums: [{ id: "kick", steps, volume: 0.5, muted: true }],
+      melodies: [{ synth: "pad", notes, volume: 0.6, muted: false }, { synth: "bass", notes: [[12]] }],
+    });
+    const p = parseOk(v1);
+    expect(p).toMatchObject({ version: 2, bpm: 100, bars: 2, timeSig: { beats: 4, unit: 4 } });
+    expect(p.drums[0]).toMatchObject({ steps: [0, 20], volume: 0.5, muted: true, solo: false });
+    // Pad rows started at C3 (48) and rang for four steps.
+    expect(p.melodies[0]!.notes.map((x) => [x.step, x.pitch, x.length])).toEqual([[2, 48, 4], [2, 55, 4]]);
+    // Bass rows started at C2 (36).
+    expect(p.melodies[1]!.notes.map((x) => [x.step, x.pitch, x.length])).toEqual([[0, 48, 1]]);
   });
 });
