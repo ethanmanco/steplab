@@ -1871,3 +1871,9 @@ kbd {
 .win-mixer[data-layout="auto"] {
   max-width: min(calc(100vw - 32px), 1200px);
 }
+
+.strip .slider-v,
+.slider-v {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}

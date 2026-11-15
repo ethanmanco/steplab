@@ -55,6 +55,7 @@ import {
 import { positionInPattern, recordedNote } from "./core/record";
 import { clipAt } from "./core/schedule";
 import { parseProject, serializeProject } from "./core/serialize";
+import { decodeMidi, encodeMidi, importMidi, projectToMidi } from "./core/midifile";
 import { DRUMS_808, type Channel, type DrumId, type MelodyPattern, type Project, type SynthId } from "./core/types";
 import { connectMidi } from "./midi";
 import { debounce, getStorage, loadAutosave, loadPrefs, saveAutosave, savePrefs } from "./storage";
@@ -671,6 +672,10 @@ const fileActions: FileActions = {
     toast.show("New empty song.");
   },
   async openFile(file) {
+    if (/\.midi?$/i.test(file.name)) {
+      await openMidi(file);
+      return;
+    }
     if (file.size > 200_000_000) {
       toast.show("That file is too big to be a Steplab project.", "error");
       return;
@@ -718,6 +723,43 @@ const fileActions: FileActions = {
     }
   },
 };
+fileActions.exportMidi = () => {
+  const s = store.get();
+  const pat = s.mode === "pattern" ? findPattern(s.project, s.current) : undefined;
+  const song = projectToMidi(s.project, pat?.id ?? null);
+  if (!song.tracks.length) {
+    toast.show("There are no notes to export yet.", "error");
+    return;
+  }
+  const slug = (pat?.name ?? "song").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "song";
+  const name = `steplab-${slug}-${s.project.bpm}bpm.mid`;
+  downloadBlob(new Blob([encodeMidi(song)], { type: "audio/midi" }), name);
+  toast.show(`Exported ${name}. Drag it into FL Studio's playlist or channel rack.`);
+};
+
+/** Add a MIDI file's melodies and drums to the song as new patterns. */
+async function openMidi(file: File) {
+  if (file.size > 5_000_000) {
+    toast.show("That MIDI file is too big.", "error");
+    return;
+  }
+  try {
+    const song = decodeMidi(new Uint8Array(await file.arrayBuffer()));
+    const base = file.name.replace(/\.midi?$/i, "").slice(0, 30) || "MIDI";
+    const result = importMidi(project(), song, base);
+    if (!result.patternIds.length) {
+      toast.show("That MIDI file has no notes.", "error");
+      return;
+    }
+    edit(() => result.project, null, undefined, { current: result.patternIds[0] ?? null });
+    const extra = result.skipped ? ` ${result.skipped} notes did not fit and were left out.` : "";
+    const tempo = song.bpm !== project().bpm ? ` The file was at ${song.bpm} BPM.` : "";
+    toast.show(`Added ${result.patternIds.length} pattern${result.patternIds.length === 1 ? "" : "s"} from ${file.name}.${tempo}${extra}`);
+  } catch (err) {
+    toast.show(err instanceof Error ? err.message : "That MIDI file could not be read.", "error");
+  }
+}
+
 const files = createFileBar(fileActions);
 
 /* ---------- Playheads ---------- */

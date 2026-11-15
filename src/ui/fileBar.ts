@@ -5,6 +5,7 @@ export interface FileActions {
   openFile(file: File): void;
   saveFile(): void;
   exportWav?: () => Promise<void>;
+  exportMidi?: () => void;
   undo(): void;
   redo(): void;
 }
@@ -13,7 +14,7 @@ export interface FileActions {
 export function createFileBar(actions: FileActions) {
   const input = h("input", {
     type: "file",
-    accept: ".json,application/json",
+    accept: ".json,.mid,.midi,application/json,audio/midi,audio/x-midi",
     class: "sr-only",
     tabindex: -1,
     "aria-hidden": "true",
@@ -53,9 +54,10 @@ export function createFileBar(actions: FileActions) {
     { class: "files", role: "group", "aria-label": "Project" },
     h("span", { class: "btn-pair" }, undoBtn, redoBtn),
     btn("New", "New project", actions.newProject),
-    btn("Open", "Open project file", () => input.click()),
+    btn("Open", "Open a project file, or a MIDI file to add to the song", () => input.click()),
     btn("Save", "Save project file", actions.saveFile),
     exportWav ? wav : null,
+    actions.exportMidi ? btn("MIDI", "Export MIDI for FL Studio and other DAWs", actions.exportMidi) : null,
     input,
   );
   return {
