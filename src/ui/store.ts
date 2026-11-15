@@ -5,6 +5,8 @@ export interface AppState {
   playing: boolean;
   /** Which bar of the loop the grids are showing (0-based). */
   editBar: number;
+  /** Which melody track the piano roll is showing. */
+  activeMelody: number;
 }
 
 type Listener = (state: AppState, prev: AppState) => void;

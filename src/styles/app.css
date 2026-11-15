@@ -16,8 +16,12 @@
   --c-ohat: #00a383;
   --c-clap: #9b4dca;
   --c-tom: #ff7a2f;
+  --c-m1: #e8407f;
+  --c-m2: #1e9bd7;
+  --key-black: #e4dccb;
 
   --cell: 40px;
+  --roll-row: 24px;
   --gap: 5px;
   --beat-gap: 10px;
   --head: 176px;
@@ -46,6 +50,9 @@
     --c-ohat: #19c29e;
     --c-clap: #b46fe0;
     --c-tom: #ff8d4a;
+    --c-m1: #ff5b98;
+    --c-m2: #3db6f0;
+    --key-black: #0f0e12;
 
     color-scheme: dark;
   }
@@ -54,6 +61,7 @@
 @media (pointer: coarse) {
   :root {
     --cell: 44px;
+    --roll-row: 36px;
     --head: 140px;
   }
 }
@@ -523,6 +531,185 @@ input[type="range"] {
   box-shadow: 1px 1px 0 var(--shadow);
 }
 
+/* ---------- Melody panel ---------- */
+
+.melody-panel[data-track="0"] { --c: var(--c-m1); }
+.melody-panel[data-track="1"] { --c: var(--c-m2); }
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-right: auto;
+}
+
+.panel-head h2 + .tabs {
+  margin-left: -8px;
+}
+
+.melody-panel .panel-head h2 {
+  margin-right: 0;
+}
+
+.tab {
+  display: grid;
+  justify-items: start;
+  min-height: 44px;
+  padding: 4px 14px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--panel);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tab-name {
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.tab-sub {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+}
+
+.tab[data-track="0"] { --tab-c: var(--c-m1); }
+.tab[data-track="1"] { --tab-c: var(--c-m2); }
+
+.tab[aria-selected="true"] {
+  background: var(--tab-c);
+  color: #fff;
+  box-shadow: 3px 3px 0 var(--shadow);
+}
+
+.tab[aria-selected="true"] .tab-sub {
+  color: inherit;
+}
+
+.tab.is-muted .tab-name {
+  text-decoration: line-through;
+}
+
+.melody-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 0 16px 14px;
+}
+
+.melody-controls .track-head {
+  position: static;
+  flex: 1 1 200px;
+  width: auto;
+  max-width: 260px;
+  padding: 0;
+  border: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.melody-controls .track-name {
+  display: none;
+}
+
+.melody-controls .mute {
+  width: 36px;
+  height: 32px;
+}
+
+.seg-sound .seg-opt span {
+  min-width: 56px;
+  font-size: 0.85rem;
+}
+
+/* The roll scrolls on both axes, with the ruler and keys pinned. */
+.roll-scroller {
+  max-height: min(70vh, 700px);
+  overflow: auto;
+  padding-top: 0;
+}
+
+.roll {
+  gap: 3px;
+}
+
+.roll .ruler {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--panel);
+  padding: 4px 0;
+}
+
+.roll .ruler-corner {
+  z-index: 4;
+}
+
+.roll .cell {
+  height: var(--roll-row);
+  border-radius: 5px;
+}
+
+.roll .cell.on {
+  box-shadow: 2px 2px 0 var(--shadow);
+}
+
+.track-muted .roll .cell.on {
+  opacity: 0.35;
+}
+
+.roll .cell.on.now {
+  box-shadow: 0 0 0 var(--shadow);
+}
+
+.key {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: var(--roll-row);
+  padding-right: 10px;
+  border-radius: 0 5px 5px 0;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  border-left: 0;
+}
+
+.roll .track-head,
+.roll .row > .key {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  flex: 0 0 var(--head);
+  width: var(--head);
+  background: var(--panel);
+}
+
+.roll .row[data-black="true"] > .key {
+  background: var(--key-black);
+}
+
+.roll .row[data-c="true"] > .key {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+/* Darker lanes for the black keys so the scale is easy to follow. */
+.roll .row[data-black="true"] .cell:not(.on):not(.now) {
+  background: var(--alt);
+}
+
+.roll .row[data-black="false"] .cell.alt:not(.on):not(.now) {
+  background: var(--panel);
+}
+
+/* A line above every C marks the octaves. */
+.roll .row[data-c="true"] {
+  box-shadow: 0 -2px 0 var(--line);
+}
+
 /* ---------- Footer ---------- */
 
 .foot {
@@ -621,6 +808,12 @@ kbd {
   }
   .track-head {
     padding: 0 8px 0 10px;
+  }
+  /* Note names need far less room than track controls. */
+  .roll .row > .key,
+  .roll .ruler-corner {
+    flex-basis: 56px;
+    width: 56px;
   }
   .track-mix {
     gap: 6px;

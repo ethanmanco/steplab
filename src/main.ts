@@ -1,15 +1,26 @@
 import "./styles/app.css";
 import { Engine } from "./audio/engine";
-import { clearDrums, demoProject, setBpm, setLoopBars, setTrackMix, toggleDrumStep } from "./core/project";
+import {
+  clearDrums,
+  clearMelody,
+  demoProject,
+  setBpm,
+  setLoopBars,
+  setSynth,
+  setTrackMix,
+  toggleDrumStep,
+  toggleNote,
+} from "./core/project";
 import type { Project } from "./core/types";
 import { createDrumGrid } from "./ui/drumGrid";
 import { h } from "./ui/dom";
+import { createMelodyPanel } from "./ui/melodyPanel";
 import { showStartOverlay } from "./ui/startOverlay";
 import { createStore } from "./ui/store";
 import { createTransport } from "./ui/transport";
 
 const initialProject = demoProject();
-const store = createStore({ project: initialProject, playing: false, editBar: 0 });
+const store = createStore({ project: initialProject, playing: false, editBar: 0, activeMelody: 0 });
 const engine = new Engine(initialProject);
 
 function updateProject(fn: (p: Project) => Project): void {
@@ -49,7 +60,24 @@ const drums = createDrumGrid(initialProject.drums, {
   clear: () => updateProject(clearDrums),
 });
 
-engine.setStepListener((step) => drums.setPlayhead(step));
+const melody = createMelodyPanel({
+  toggle(track, step, row) {
+    const wasOn = store.get().project.melodies[track]?.notes[step]?.includes(row);
+    updateProject((p) => toggleNote(p, track, step, row));
+    if (!wasOn) engine.previewNote(track, row);
+  },
+  setSynth: (track, synth) => updateProject((p) => setSynth(p, track, synth)),
+  setMute: (track, muted) => updateProject((p) => setTrackMix(p, "melodies", track, { muted })),
+  setVolume: (track, volume) => updateProject((p) => setTrackMix(p, "melodies", track, { volume })),
+  setEditBar: (bar) => store.set({ editBar: bar }),
+  setActive: (track) => store.set({ activeMelody: track }),
+  clear: (track) => updateProject((p) => clearMelody(p, track)),
+});
+
+engine.setStepListener((step) => {
+  drums.setPlayhead(step);
+  melody.setPlayhead(step);
+});
 
 const app = document.getElementById("app")!;
 app.append(
@@ -59,7 +87,18 @@ app.append(
     h("div", { class: "brand" }, h("span", { class: "logo", "aria-hidden": "true" }, "Steplab")),
     transport.el,
   ),
-  h("main", { class: "main" }, h("h1", { class: "sr-only" }, "Steplab beat maker"), drums.el),
+  h(
+    "main",
+    { class: "main" },
+    h("h1", { class: "sr-only" }, "Steplab beat maker"),
+    h(
+      "p",
+      { id: "grid-help", class: "sr-only" },
+      "Arrow keys move between steps. Space or Enter turns a step on or off.",
+    ),
+    drums.el,
+    melody.el,
+  ),
   h(
     "footer",
     { class: "foot" },
@@ -74,6 +113,7 @@ function render() {
   const s = store.get();
   transport.update(s);
   drums.update(s);
+  melody.update(s);
 }
 store.subscribe((s, prev) => {
   if (s.project !== prev.project) engine.setProject(s.project);
