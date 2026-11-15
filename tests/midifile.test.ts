@@ -145,7 +145,7 @@ describe("importMidi", () => {
     const mel = findPattern(project, patternIds[0]!) as MelodyPattern;
     const orig = src.patterns.find((x) => x.name === "Hook") as MelodyPattern;
     expect(mel.notes.map((n) => [n.step, n.pitch, n.length])).toEqual(orig.notes.map((n) => [n.step, n.pitch, n.length]));
-    expect(project.channels.find((c) => c.id === mel.channelId)).toMatchObject({ kind: "synth", sound: "piano" });
+    expect(project.channels.find((c) => c.id === mel.channelId)).toMatchObject({ kind: "synth", sound: "keys" });
     expect(project.clips.some((c) => c.patternId === mel.id && c.start === 0)).toBe(true);
   });
 

@@ -52,7 +52,7 @@ describe("pattern mode", () => {
 describe("song mode", () => {
   it("plays every clip under the playhead", () => {
     const p = defaultBeat();
-    // Bars 1 and 2 are the piano hook and the pad on their own.
+    // Bars 1 and 2 are the electric piano hook and the pad on their own.
     const at0 = songEventsAtStep(p, 0);
     expect(at0.drums).toEqual([]);
     expect(at0.notes.map((x) => x.pitch).sort()).toEqual([60, 63, 67, 72]);

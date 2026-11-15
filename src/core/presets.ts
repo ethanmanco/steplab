@@ -121,8 +121,8 @@ const lib = (id: string, name: string, url: string, root: number): SampleInfo =>
 /* ---------- Default beat ---------- */
 
 /**
- * The song Steplab opens with: dark trap in C minor at 140 BPM. A piano hook
- * and a pad play for two bars, then the half-time drums and a sliding 808
+ * The song Steplab opens with: dark trap in C minor at 140 BPM. An electric
+ * piano hook and a pad play for two bars, then the half-time drums and a sliding 808
  * drop in on bar 3. Built from the standard 808 kit, so every row in the
  * channel rack has something to do.
  */
@@ -134,11 +134,9 @@ export function defaultBeat(): Project {
   const ohat = s.drum("ohat808", "Open hat", { volume: 0.5 });
   const clap = s.drum("clap808", "Clap", { fx: { reverb: 0.2 } });
   const rim = s.drum("rim", "Rim", { volume: 0.45, pan: 0.3 });
-  const piano = s.synth("piano", "Piano", {
-    volume: 0.75,
-    sample: lib("grand-piano", "Grand piano", "samples/keys/grand-piano.wav", 72),
-    fx: { reverb: 0.35, delay: 0.15 },
-  });
+  // An FM electric piano is softer than a sampled grand, so it runs full with
+  // some compression to sit on top of the drums.
+  const keys = s.synth("keys", "Electric piano", { volume: 1, fx: { comp: 0.6, reverb: 0.35, delay: 0.15 } });
   const pad = s.synth("pad", "Pad", { volume: 0.5, tone: { cutoff: 0.6 }, fx: { reverb: 0.5 } });
   const bass = s.synth("b808", "808", { volume: 0.85, tone: { glide: 0.3 } });
 
@@ -157,7 +155,7 @@ export function defaultBeat(): Project {
     [0, 36, 7], [7, 36, 3], [10, 36, 6],
     [16, 32, 6], [22, 32, 4], [26, 31, 3], [29, 43, 3],
   ]);
-  const hook = s.melody("Hook", piano, 4, [
+  const hook = s.melody("Hook", keys, 4, [
     [0, 72, 2], [2, 75, 2], [4, 79, 3], [7, 75, 1], [8, 74, 2], [10, 75, 2], [12, 72, 4],
     [16, 72, 2], [18, 75, 2], [20, 80, 3], [23, 79, 1], [24, 74, 2], [26, 71, 2], [28, 74, 4],
     [32, 72, 2], [34, 75, 2], [36, 79, 3], [39, 80, 1], [40, 79, 2], [42, 75, 2], [44, 77, 2], [46, 75, 2],
@@ -349,7 +347,7 @@ export const PRESETS: Preset[] = [
   {
     id: "default",
     name: "Default beat",
-    description: "The beat Steplab opens with. 140 BPM dark trap in C minor: a piano hook, then half-time 808 drums and a sliding 808 from bar 3.",
+    description: "The beat Steplab opens with. 140 BPM dark trap in C minor: an electric piano hook, then half-time 808 drums and a sliding 808 from bar 3.",
     build: defaultBeat,
   },
   {
