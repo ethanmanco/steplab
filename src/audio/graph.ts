@@ -1,9 +1,8 @@
 import * as Tone from "tone";
 import { volumeToDb } from "../core/mix";
-import { rowToMidi } from "../core/notes";
-import { eventsAtStep } from "../core/schedule";
-import { secondsPerStep } from "../core/timing";
-import type { Project, SynthId, TrackMix } from "../core/types";
+import { audibleTracks, eventsAtStep } from "../core/schedule";
+import { secondsPerStep, swingDelay } from "../core/timing";
+import type { Project, SynthId } from "../core/types";
 import { createDrumKit } from "./drums";
 import { createInstrument, type Instrument } from "./instruments";
 
@@ -15,18 +14,19 @@ import { createInstrument, type Instrument } from "./instruments";
 export interface Graph {
   playStep(project: Project, step: number, time: number): void;
   previewDrum(project: Project, track: number, time: number): void;
-  previewNote(project: Project, track: number, row: number, time: number): void;
+  noteOn(project: Project, track: number, pitch: number, velocity: number, time: number): void;
+  noteOff(track: number, pitch: number, time: number): void;
   applyMix(project: Project): void;
   silence(time?: number): void;
   dispose(): void;
 }
 
-/** Notes end a little before the next step so repeated notes stay distinct. */
-const NOTE_FILL = 0.9;
+/** Notes end a hair before their last step so repeated notes stay distinct. */
+const NOTE_FILL = 0.92;
 
-function setChannel(ch: Tone.Channel, mix: TrackMix): void {
-  ch.mute = mix.muted;
-  const db = volumeToDb(mix.volume);
+function setChannel(ch: Tone.Channel, volume: number, audible: boolean): void {
+  ch.mute = !audible;
+  const db = volumeToDb(volume);
   if (Number.isFinite(db)) ch.volume.rampTo(db, 0.02);
   else ch.volume.value = -Infinity;
 }
@@ -73,33 +73,40 @@ export function createGraph(project: Project): Graph {
   const graph: Graph = {
     playStep(p, step, time) {
       const events = eventsAtStep(p, step);
-      for (const hit of events.drums) kit[hit.id].trigger(time);
+      const at = time + swingDelay(step, p.swing, p.bpm);
+      for (const hit of events.drums) kit[hit.id].trigger(at);
       const stepSec = secondsPerStep(p.bpm);
       for (const hit of events.melodies) {
         const inst = melodies[hit.track]?.instrument;
         if (!inst) continue;
-        for (const n of hit.notes) inst.play(n.midi, n.steps * stepSec * NOTE_FILL, time);
+        for (const n of hit.notes) inst.play(n.pitch, n.steps * stepSec * NOTE_FILL, at, n.velocity);
       }
     },
     previewDrum(p, track, time) {
       const d = p.drums[track];
-      if (d && !d.muted) kit[d.id].trigger(time);
+      if (d && audibleTracks(p).drums[track]) kit[d.id].trigger(time);
     },
-    previewNote(p, track, row, time) {
-      const m = p.melodies[track];
-      const inst = melodies[track]?.instrument;
-      if (!m || m.muted || !inst) return;
-      inst.play(rowToMidi(m.synth, row), secondsPerStep(p.bpm) * 2, time);
+    noteOn(p, track, pitch, velocity, time) {
+      // A live key is always heard on the track being played, even if muted
+      // by a solo elsewhere, so you can hear what you are recording.
+      if (p.melodies[track]?.muted) return;
+      melodies[track]?.instrument.attack(pitch, time, velocity);
+    },
+    noteOff(track, pitch, time) {
+      melodies[track]?.instrument.release(pitch, time);
     },
     applyMix(p) {
       syncSynths(p);
+      const audible = audibleTracks(p);
       p.drums.forEach((d, i) => {
         const ch = drumChannels[i];
-        if (ch) setChannel(ch, d);
+        if (ch) setChannel(ch, d.volume, audible.drums[i] ?? true);
       });
       p.melodies.forEach((m, i) => {
         const slot = melodies[i];
-        if (slot) setChannel(slot.channel, m);
+        // Melody channels stay open for live playing; the sequencer itself
+        // skips tracks that are not audible.
+        if (slot) setChannel(slot.channel, m.volume, !m.muted);
       });
     },
     silence(time) {

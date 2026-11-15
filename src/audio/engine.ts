@@ -1,7 +1,9 @@
 import * as Tone from "tone";
-import { stepFromTicks } from "../core/timing";
+import { loopSteps, pulseSteps, secondsPerStep, stepFromTicks, stepsPerBar } from "../core/timing";
 import type { Project } from "../core/types";
 import { createGraph, type Graph } from "./graph";
+
+export type PlayState = "stopped" | "counting" | "playing" | "paused";
 
 /**
  * Live playback. Tone's transport runs on the audio clock and schedules a
@@ -15,8 +17,13 @@ import { createGraph, type Graph } from "./graph";
 export class Engine {
   private project: Project;
   private graph?: Graph;
+  private click?: Tone.Synth;
   private onStep: (step: number) => void = () => {};
-  playing = false;
+  private onState: (state: PlayState) => void = () => {};
+  private countInEnd = 0;
+  private countInTimer?: number;
+  state: PlayState = "stopped";
+  metronome = false;
 
   constructor(project: Project) {
     this.project = project;
@@ -29,16 +36,31 @@ export class Engine {
     const transport = Tone.getTransport();
     transport.bpm.value = this.project.bpm;
     this.graph = createGraph(this.project);
+    this.click = new Tone.Synth({
+      oscillator: { type: "triangle" },
+      envelope: { attack: 0.001, decay: 0.05, sustain: 0, release: 0.02 },
+      volume: -10,
+    }).toDestination();
+
     new Tone.Loop((time) => {
       const p = this.project;
-      const step = stepFromTicks(transport.getTicksAtTime(time), transport.PPQ, p.bars);
+      const step = stepFromTicks(transport.getTicksAtTime(time), transport.PPQ, loopSteps(p.bars, p.timeSig));
       this.graph?.playStep(p, step, time);
-      // Stop lands a look-ahead later than it is pressed, so a step or two
-      // can still be queued; only draw them while actually playing.
+      if (this.metronome) this.tick(step, time);
+      // Stop and pause land a look-ahead after they are pressed, so a step
+      // can still be queued; only draw it while actually playing.
       Tone.getDraw().schedule(() => {
-        if (this.playing) this.onStep(step);
+        if (this.state === "playing") this.onStep(step);
       }, time);
     }, "16n").start(0);
+  }
+
+  /** A metronome click on each pulse, higher on the first beat of the bar. */
+  private tick(step: number, time: number) {
+    const sig = this.project.timeSig;
+    const inBar = step % stepsPerBar(sig);
+    if (inBar % pulseSteps(sig) !== 0) return;
+    this.click?.triggerAttackRelease(inBar === 0 ? "C6" : "G5", 0.03, time, inBar === 0 ? 1 : 0.6);
   }
 
   setProject(project: Project): void {
@@ -52,33 +74,101 @@ export class Engine {
     this.onStep = fn;
   }
 
-  play(): void {
-    if (!this.graph || this.playing) return;
-    this.playing = true;
-    // A small offset gives the first step the same look-ahead as the rest.
-    Tone.getTransport().start("+0.05", 0);
+  setStateListener(fn: (state: PlayState) => void): void {
+    this.onState = fn;
+  }
+
+  private setState(state: PlayState) {
+    this.state = state;
+    this.onState(state);
+  }
+
+  /**
+   * Start or resume. With a count-in, one bar of clicks plays first and the
+   * loop starts on the next downbeat.
+   */
+  play(countIn = false): void {
+    if (!this.graph || this.state === "playing" || this.state === "counting") return;
+    const transport = Tone.getTransport();
+    const startAt = Tone.now() + 0.05;
+    let begin = startAt;
+    if (countIn) {
+      const sig = this.project.timeSig;
+      const pulse = pulseSteps(sig) * secondsPerStep(this.project.bpm);
+      const pulses = Math.max(1, Math.round(stepsPerBar(sig) / pulseSteps(sig)));
+      for (let i = 0; i < pulses; i++) {
+        this.click?.triggerAttackRelease(i === 0 ? "C6" : "G5", 0.03, startAt + i * pulse, i === 0 ? 1 : 0.6);
+      }
+      begin = startAt + pulses * pulse;
+      this.countInEnd = begin;
+      this.setState("counting");
+      const wait = (begin - Tone.immediate()) * 1000;
+      this.countInTimer = window.setTimeout(() => {
+        if (this.state === "counting") this.setState("playing");
+      }, Math.max(0, wait));
+    } else {
+      this.countInEnd = 0;
+      this.setState("playing");
+    }
+    // After a pause the transport carries on from where it stopped.
+    transport.start(begin);
+  }
+
+  pause(): void {
+    if (this.state !== "playing" && this.state !== "counting") return;
+    window.clearTimeout(this.countInTimer);
+    Tone.getTransport().pause();
+    Tone.getDraw().cancel(0);
+    this.graph?.silence();
+    this.setState("paused");
   }
 
   stop(): void {
-    if (!this.playing) return;
-    this.playing = false;
+    if (this.state === "stopped") return;
+    window.clearTimeout(this.countInTimer);
     const transport = Tone.getTransport();
     transport.stop();
     transport.position = 0;
     Tone.getDraw().cancel(0);
     this.graph?.silence();
+    this.setState("stopped");
     this.onStep(-1);
   }
 
-  /** Let people hear a note as they place it while stopped. */
-  previewNote(track: number, row: number): void {
-    if (!this.graph || this.playing) return;
-    this.graph.previewNote(this.project, track, row, Tone.now() + 0.01);
+  /**
+   * Where the music is right now, in steps since the transport started (not
+   * wrapped around the loop), as the listener hears it. Negative during a
+   * count-in. Null when stopped or paused.
+   */
+  heardSteps(): number | null {
+    if (this.state !== "playing" && this.state !== "counting") return null;
+    const raw = Tone.getContext().rawContext as AudioContext;
+    const now = Tone.immediate() - (raw.outputLatency || 0);
+    if (now < this.countInEnd) return (now - this.countInEnd) / secondsPerStep(this.project.bpm);
+    const transport = Tone.getTransport();
+    return transport.getTicksAtTime(now) / (transport.PPQ / 4);
   }
 
   /** Let people hear a drum as they place it while stopped. */
   previewDrum(track: number): void {
-    if (!this.graph || this.playing) return;
+    if (!this.graph || this.state === "playing") return;
     this.graph.previewDrum(this.project, track, Tone.now() + 0.01);
+  }
+
+  /** Let people hear a note as they place it while stopped. */
+  previewNote(track: number, pitch: number): void {
+    if (!this.graph || this.state === "playing") return;
+    const at = Tone.now() + 0.01;
+    this.graph.noteOn(this.project, track, pitch, 0.8, at);
+    this.graph.noteOff(track, pitch, at + secondsPerStep(this.project.bpm) * 2);
+  }
+
+  /** Live keys: start and end a held note right away. */
+  noteOn(track: number, pitch: number, velocity: number): void {
+    this.graph?.noteOn(this.project, track, pitch, velocity, Tone.immediate());
+  }
+
+  noteOff(track: number, pitch: number): void {
+    this.graph?.noteOff(track, pitch, Tone.immediate());
   }
 }

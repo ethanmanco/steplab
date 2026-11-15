@@ -1,5 +1,5 @@
 import * as Tone from "tone";
-import { loopSeconds, stepFromTicks } from "../core/timing";
+import { loopSeconds, loopSteps, stepFromTicks } from "../core/timing";
 import type { Project } from "../core/types";
 import { encodeWav, loopSlice } from "../core/wav";
 import { createGraph } from "./graph";
@@ -13,13 +13,13 @@ const SAMPLE_RATE = 44100;
  * kept, so tails wrap around and the WAV loops seamlessly in other apps.
  */
 export async function renderLoopWav(project: Project): Promise<Blob> {
-  const seconds = loopSeconds(project.bpm, project.bars);
+  const seconds = loopSeconds(project.bpm, project.bars, project.timeSig);
+  const total = loopSteps(project.bars, project.timeSig);
   const buffer = await Tone.Offline(({ transport }) => {
     const graph = createGraph(project);
     transport.bpm.value = project.bpm;
     new Tone.Loop((time) => {
-      const step = stepFromTicks(transport.getTicksAtTime(time), transport.PPQ, project.bars);
-      graph.playStep(project, step, time);
+      graph.playStep(project, stepFromTicks(transport.getTicksAtTime(time), transport.PPQ, total), time);
     }, "16n").start(0);
     transport.start(0);
   }, seconds * 2, 2, SAMPLE_RATE);

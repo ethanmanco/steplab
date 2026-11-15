@@ -5,20 +5,24 @@ import type { SynthId } from "../core/types";
 /** A playable melody voice: polyphonic, so a step can hold a chord. */
 export interface Instrument {
   output: Tone.ToneAudioNode;
-  play(midi: number, seconds: number, time: number): void;
+  /** A note with a known length, from the sequencer. */
+  play(midi: number, seconds: number, time: number, velocity: number): void;
+  /** Start and end a held note, from a live keyboard. */
+  attack(midi: number, time: number, velocity: number): void;
+  release(midi: number, time: number): void;
   releaseAll(time?: number): void;
   dispose(): void;
 }
 
-function wrap(
-  synth: Tone.PolySynth,
-  chain: Tone.ToneAudioNode[] = [],
-): Instrument {
+function wrap(synth: Tone.PolySynth, chain: Tone.ToneAudioNode[] = []): Instrument {
   const nodes = [synth, ...chain];
   for (let i = 0; i < nodes.length - 1; i++) nodes[i]!.connect(nodes[i + 1]!);
   return {
     output: nodes[nodes.length - 1]!,
-    play: (midi, seconds, time) => synth.triggerAttackRelease(midiToFreq(midi), seconds, time),
+    play: (midi, seconds, time, velocity) =>
+      synth.triggerAttackRelease(midiToFreq(midi), seconds, time, velocity),
+    attack: (midi, time, velocity) => synth.triggerAttack(midiToFreq(midi), time, velocity),
+    release: (midi, time) => synth.triggerRelease(midiToFreq(midi), time),
     releaseAll: (time) => synth.releaseAll(time),
     dispose: () => nodes.forEach((n) => n.dispose()),
   };
