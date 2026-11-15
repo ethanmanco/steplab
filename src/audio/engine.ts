@@ -1,6 +1,7 @@
 import * as Tone from "tone";
-import { loopSteps, pulseSteps, secondsPerStep, stepFromTicks, stepsPerBar } from "../core/timing";
-import type { Project } from "../core/types";
+import { eventsAt, loopLength } from "../core/schedule";
+import { pulseSteps, secondsPerStep, stepFromTicks, stepsPerBar } from "../core/timing";
+import type { PlayMode, Project } from "../core/types";
 import { createGraph, type Graph } from "./graph";
 
 export type PlayState = "stopped" | "counting" | "playing" | "paused";
@@ -16,6 +17,8 @@ export type PlayState = "stopped" | "counting" | "playing" | "paused";
  */
 export class Engine {
   private project: Project;
+  private mode: PlayMode = "song";
+  private patternId: string | null = null;
   private graph?: Graph;
   private click?: Tone.Synth;
   private onStep: (step: number) => void = () => {};
@@ -44,8 +47,9 @@ export class Engine {
 
     new Tone.Loop((time) => {
       const p = this.project;
-      const step = stepFromTicks(transport.getTicksAtTime(time), transport.PPQ, loopSteps(p.bars, p.timeSig));
-      this.graph?.playStep(p, step, time);
+      const total = loopLength(p, this.mode, this.patternId);
+      const step = stepFromTicks(transport.getTicksAtTime(time), transport.PPQ, total);
+      this.graph?.play(p, eventsAt(p, this.mode, this.patternId, step), step, time);
       if (this.metronome) this.tick(step, time);
       // Stop and pause land a look-ahead after they are pressed, so a step
       // can still be queued; only draw it while actually playing.
@@ -67,7 +71,20 @@ export class Engine {
     const prev = this.project;
     this.project = project;
     if (prev.bpm !== project.bpm) Tone.getTransport().bpm.value = project.bpm;
-    this.graph?.applyMix(project);
+    this.graph?.sync(project);
+  }
+
+  /** Pattern mode loops one pattern; Song mode plays the playlist. */
+  setSource(mode: PlayMode, patternId: string | null): void {
+    this.mode = mode;
+    this.patternId = patternId;
+  }
+
+  /** Jump to a step (used by clicking the playlist ruler). */
+  seek(step: number): void {
+    const transport = Tone.getTransport();
+    transport.ticks = Math.max(0, step) * (transport.PPQ / 4);
+    if (this.state !== "playing") this.onStep(step);
   }
 
   setStepListener(fn: (step: number) => void): void {
@@ -150,25 +167,26 @@ export class Engine {
   }
 
   /** Let people hear a drum as they place it while stopped. */
-  previewDrum(track: number): void {
+  previewDrum(channelId: string): void {
     if (!this.graph || this.state === "playing") return;
-    this.graph.previewDrum(this.project, track, Tone.now() + 0.01);
+    this.graph.previewDrum(channelId, Tone.now() + 0.01);
   }
 
   /** Let people hear a note as they place it while stopped. */
-  previewNote(track: number, pitch: number): void {
+  previewNote(channelId: string, pitch: number): void {
     if (!this.graph || this.state === "playing") return;
     const at = Tone.now() + 0.01;
-    this.graph.noteOn(this.project, track, pitch, 0.8, at);
-    this.graph.noteOff(track, pitch, at + secondsPerStep(this.project.bpm) * 2);
+    this.graph.noteOn(channelId, pitch, 0.8, at);
+    this.graph.noteOff(channelId, pitch, at + secondsPerStep(this.project.bpm) * 2);
   }
 
   /** Live keys: start and end a held note right away. */
-  noteOn(track: number, pitch: number, velocity: number): void {
-    this.graph?.noteOn(this.project, track, pitch, velocity, Tone.immediate());
+  noteOn(channelId: string, pitch: number, velocity: number): void {
+    if (this.project.channels.find((c) => c.id === channelId)?.muted) return;
+    this.graph?.noteOn(channelId, pitch, velocity, Tone.immediate());
   }
 
-  noteOff(track: number, pitch: number): void {
-    this.graph?.noteOff(track, pitch, Tone.immediate());
+  noteOff(channelId: string, pitch: number): void {
+    this.graph?.noteOff(channelId, pitch, Tone.immediate());
   }
 }

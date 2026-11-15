@@ -9,10 +9,10 @@ import type { DrumId } from "../core/types";
 export interface DrumVoice {
   output: Tone.ToneAudioNode;
   trigger(time: number): void;
+  /** Cut a ringing sound short (a closed hat chokes an open hat). */
+  choke?(time: number): void;
   dispose(): void;
 }
-
-export type DrumKit = Record<DrumId, DrumVoice>;
 
 function kick(): DrumVoice {
   const body = new Tone.MembraneSynth({
@@ -82,6 +82,7 @@ function hat(decay: number): { voice: DrumVoice; synth: Tone.MetalSynth } {
     voice: {
       output: filter,
       trigger: (t) => synth.triggerAttack(220, t),
+      choke: (t) => synth.triggerRelease(t),
       dispose: () => [synth, filter].forEach((n) => n.dispose()),
     },
   };
@@ -128,22 +129,20 @@ function tom(): DrumVoice {
   };
 }
 
-export function createDrumKit(): DrumKit {
-  const closed = hat(0.05);
-  const open = hat(0.38);
-  return {
-    kick: kick(),
-    snare: snare(),
-    chat: {
-      ...closed.voice,
-      // A closed hat chokes a ringing open hat, like on a real kit.
-      trigger: (t) => {
-        open.synth.triggerRelease(t);
-        closed.voice.trigger(t);
-      },
-    },
-    ohat: open.voice,
-    clap: clap(),
-    tom: tom(),
-  };
+/** Build one drum sound. Every drum channel gets its own voice. */
+export function createDrumVoice(id: DrumId): DrumVoice {
+  switch (id) {
+    case "kick":
+      return kick();
+    case "snare":
+      return snare();
+    case "chat":
+      return hat(0.05).voice;
+    case "ohat":
+      return hat(0.38).voice;
+    case "clap":
+      return clap();
+    case "tom":
+      return tom();
+  }
 }
