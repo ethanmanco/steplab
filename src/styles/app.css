@@ -1,0 +1,664 @@
+/* Steplab: a paper drum machine. Warm paper, black ink, flat print colors. */
+
+:root {
+  --paper: #f3eee2;
+  --panel: #fbf8f1;
+  --ink: #1c1a17;
+  --ink-soft: #5f594e;
+  --line: #d6ccb8;
+  --alt: #ede6d6;
+  --shadow: #1c1a17;
+  --focus: #2f5fd0;
+
+  --c-kick: #ff4f5e;
+  --c-snare: #2f5fd0;
+  --c-chat: #f5b700;
+  --c-ohat: #00a383;
+  --c-clap: #9b4dca;
+  --c-tom: #ff7a2f;
+
+  --cell: 40px;
+  --gap: 5px;
+  --beat-gap: 10px;
+  --head: 176px;
+  --radius: 8px;
+
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #131217;
+    --panel: #1b1a20;
+    --ink: #f1ead9;
+    --ink-soft: #a69e8e;
+    --line: #36333d;
+    --alt: #222029;
+    --shadow: #000;
+    --focus: #8fb0ff;
+
+    --c-kick: #ff6170;
+    --c-snare: #5b85f0;
+    --c-chat: #ffc61a;
+    --c-ohat: #19c29e;
+    --c-clap: #b46fe0;
+    --c-tom: #ff8d4a;
+
+    color-scheme: dark;
+  }
+}
+
+@media (pointer: coarse) {
+  :root {
+    --cell: 44px;
+    --head: 140px;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100vh;
+  line-height: 1.4;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ---------- Layout ---------- */
+
+.app {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+}
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 14px 0;
+  background: var(--paper);
+  border-bottom: 2px solid var(--ink);
+}
+
+.main {
+  display: grid;
+  /* minmax(0, 1fr) stops wide grids from stretching the page sideways. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  padding-top: 20px;
+}
+
+/* ---------- Logo: two inks printed slightly out of register ---------- */
+
+.logo {
+  font-family: var(--mono);
+  font-weight: 800;
+  font-size: 1.5rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow:
+    2px 2px 0 var(--c-kick),
+    -2px -1px 0 var(--c-snare);
+  margin: 0;
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 3px 3px 0 var(--shadow);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform 80ms ease,
+    box-shadow 80ms ease;
+}
+
+.btn svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+
+.btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--shadow);
+}
+
+.btn-play.is-on {
+  background: var(--c-ohat);
+  color: #fff;
+}
+
+.btn-small {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.875rem;
+  box-shadow: 2px 2px 0 var(--shadow);
+}
+
+/* ---------- Transport ---------- */
+
+.transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+}
+
+.transport-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.tempo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-label,
+.seg-legend {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.tempo input[type="range"] {
+  width: 120px;
+}
+
+input[type="range"] {
+  accent-color: var(--ink);
+  min-height: 28px;
+  cursor: pointer;
+}
+
+.bpm-num {
+  width: 3.2em;
+  min-height: 40px;
+  padding: 0 6px;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  background: var(--panel);
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 1rem;
+  text-align: center;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.bpm-num::-webkit-inner-spin-button,
+.bpm-num::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.unit {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+/* ---------- Segmented radio switch ---------- */
+
+.seg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.seg-legend {
+  float: left;
+  padding: 0;
+}
+
+.seg-row {
+  display: inline-flex;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.seg-opt {
+  position: relative;
+  cursor: pointer;
+}
+
+.seg-opt span {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  min-height: 36px;
+  padding: 0 8px;
+  font-family: var(--mono);
+  font-weight: 700;
+}
+
+.seg-opt + .seg-opt span {
+  border-left: 2px solid var(--ink);
+}
+
+.seg-opt input:checked + span {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.seg-opt input:focus-visible + span {
+  outline: 3px solid var(--focus);
+  outline-offset: -5px;
+}
+
+/* A dot on the bar that is playing right now. */
+.seg-opt.marked span::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--c-kick);
+}
+
+/* ---------- Panels ---------- */
+
+.panel {
+  background: var(--panel);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  box-shadow: 5px 5px 0 var(--shadow);
+  padding: 14px 0 16px;
+}
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  padding: 0 16px 12px;
+}
+
+.panel-head h2 {
+  margin: 0 auto 0 0;
+  font-family: var(--mono);
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* The grid scrolls sideways on narrow screens; track names stay pinned. */
+.scroller {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 4px 16px 8px 0;
+  scrollbar-width: thin;
+}
+
+.grid {
+  display: grid;
+  gap: var(--gap);
+  width: max-content;
+}
+
+.row,
+.ruler {
+  display: flex;
+  align-items: center;
+}
+
+.track-head,
+.ruler-corner {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  flex: 0 0 var(--head);
+  width: var(--head);
+  align-self: stretch;
+  background: var(--panel);
+  padding: 0 12px 0 16px;
+}
+
+.track-head {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  border-left: 6px solid var(--c);
+}
+
+.track-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-mix {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fader {
+  flex: 1;
+  min-width: 0;
+  min-height: 24px;
+}
+
+.mute {
+  flex: none;
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 5px;
+  background: var(--panel);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mute[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.is-muted .track-name {
+  text-decoration: line-through;
+  color: var(--ink-soft);
+}
+
+.is-muted + .cells .cell.on {
+  opacity: 0.35;
+}
+
+.cells {
+  display: flex;
+  gap: var(--gap);
+}
+
+/* Extra space before each beat so groups of four read at a glance. */
+.cells > .beat:not(:first-child) {
+  margin-left: calc(var(--beat-gap) - var(--gap));
+}
+
+.row[data-id="kick"] { --c: var(--c-kick); }
+.row[data-id="snare"] { --c: var(--c-snare); }
+.row[data-id="chat"] { --c: var(--c-chat); }
+.row[data-id="ohat"] { --c: var(--c-ohat); }
+.row[data-id="clap"] { --c: var(--c-clap); }
+.row[data-id="tom"] { --c: var(--c-tom); }
+
+/* ---------- Ruler ---------- */
+
+.ruler-num {
+  width: var(--cell);
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  border-radius: 4px;
+  padding: 2px 0;
+}
+
+.ruler-num.beat {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.ruler-num.now {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* ---------- Step cells ---------- */
+
+.cell {
+  width: var(--cell);
+  height: var(--cell);
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  cursor: pointer;
+  transition:
+    transform 90ms ease,
+    background-color 90ms ease,
+    box-shadow 90ms ease;
+}
+
+.cell.alt {
+  background: var(--alt);
+}
+
+.cell:hover {
+  border-color: var(--ink);
+}
+
+.cell.on {
+  background: var(--c);
+  border-color: var(--ink);
+  box-shadow: 3px 3px 0 var(--shadow);
+}
+
+/* The playhead column: a tint on empty steps, a press on lit ones. */
+.cell.now {
+  background: color-mix(in srgb, var(--c) 22%, var(--panel));
+  border-color: var(--ink);
+}
+
+.cell.on.now {
+  background: var(--c);
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--shadow);
+}
+
+/* ---------- Footer ---------- */
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 24px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.foot p {
+  margin: 0;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 6px;
+  border: 1.5px solid var(--ink-soft);
+  border-bottom-width: 3px;
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 0.8em;
+  text-align: center;
+  color: var(--ink);
+}
+
+/* ---------- Start screen ---------- */
+
+.start {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  backdrop-filter: blur(3px);
+}
+
+.start-card {
+  max-width: 420px;
+  padding: 32px 28px;
+  text-align: center;
+  background: var(--panel);
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  box-shadow: 8px 8px 0 var(--shadow);
+}
+
+.start-card .logo {
+  font-size: 2.4rem;
+}
+
+.start-lede {
+  margin: 12px 0 24px;
+  font-size: 1.05rem;
+}
+
+.btn-start {
+  min-height: 56px;
+  padding: 0 28px;
+  font-size: 1.15rem;
+  background: var(--c-chat);
+  color: #1c1a17;
+}
+
+.start-note {
+  margin: 18px 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.start-error {
+  margin: 12px 0 0;
+  color: var(--c-kick);
+  font-weight: 700;
+}
+
+.start-error:empty {
+  display: none;
+}
+
+/* ---------- Small screens ---------- */
+
+@media (max-width: 640px) {
+  :root {
+    --head: 112px;
+  }
+  /* The transport wraps to several lines here, so let it scroll away. */
+  .top {
+    position: static;
+    gap: 10px;
+    padding: 10px 0;
+  }
+  .track-head {
+    padding: 0 8px 0 10px;
+  }
+  .track-mix {
+    gap: 6px;
+  }
+  .brand {
+    width: 100%;
+  }
+  .logo {
+    font-size: 1.2rem;
+  }
+  .transport {
+    gap: 10px 16px;
+  }
+  .tempo input[type="range"] {
+    width: 90px;
+  }
+  .panel {
+    box-shadow: 3px 3px 0 var(--shadow);
+  }
+}
+
+/* ---------- Reduced motion: the playhead jumps, nothing slides ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+  .btn:hover,
+  .btn:active,
+  .cell.on.now {
+    transform: none;
+  }
+  .cell.on.now {
+    box-shadow: 3px 3px 0 var(--shadow);
+    outline: 2px solid var(--ink);
+    outline-offset: 1px;
+  }
+}
