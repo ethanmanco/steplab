@@ -33,7 +33,11 @@ export class Engine {
       const p = this.project;
       const step = stepFromTicks(transport.getTicksAtTime(time), transport.PPQ, p.bars);
       this.graph?.playStep(p, step, time);
-      Tone.getDraw().schedule(() => this.onStep(step), time);
+      // Stop lands a look-ahead later than it is pressed, so a step or two
+      // can still be queued; only draw them while actually playing.
+      Tone.getDraw().schedule(() => {
+        if (this.playing) this.onStep(step);
+      }, time);
     }, "16n").start(0);
   }
 
