@@ -119,7 +119,9 @@ export function createDock(actions: DockActions) {
     const key = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>(".pkey");
     return key && piano.contains(key) ? Number(key.dataset.pitch) : null;
   };
+  let lastKeyTouch = -Infinity;
   const press = (pointer: number, pitch: number) => {
+    lastKeyTouch = performance.now();
     fingers.set(pointer, pitch);
     actions.noteDown(`t${pointer}`, pitch);
     keyEls.get(pitch)?.classList.add("is-down");
@@ -127,6 +129,7 @@ export function createDock(actions: DockActions) {
   const lift = (pointer: number) => {
     const pitch = fingers.get(pointer);
     if (pitch === undefined) return;
+    lastKeyTouch = performance.now();
     fingers.delete(pointer);
     actions.noteUp(`t${pointer}`);
     if (![...fingers.values()].includes(pitch)) keyEls.get(pitch)?.classList.remove("is-down");
@@ -135,7 +138,11 @@ export function createDock(actions: DockActions) {
     const pitch = pitchAt(e.clientX, e.clientY);
     if (pitch === null) return;
     e.preventDefault();
-    piano.setPointerCapture(e.pointerId);
+    try {
+      piano.setPointerCapture(e.pointerId);
+    } catch {
+      // The pointer is already gone; the note still plays until it lifts.
+    }
     press(e.pointerId, pitch);
   });
   piano.addEventListener("pointermove", (e) => {
@@ -149,6 +156,25 @@ export function createDock(actions: DockActions) {
     piano.addEventListener(type, (e) => lift(e.pointerId));
   }
   piano.addEventListener("contextmenu", (e) => e.preventDefault());
+  // A tap is a finger-down (which plays the key) and then a click. Phones snap
+  // that click onto the nearest button, which could be the octave + just above
+  // the keys. Cancelling the touch here means the keys never produce a click.
+  piano.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
+
+  // And in case one gets through: while a finger is on the keys, or just
+  // after, the melody picker and octave buttons ignore touches.
+  const playingKeys = () => fingers.size > 0 || performance.now() - lastKeyTouch < 500;
+  for (const type of ["pointerdown", "mousedown", "touchstart", "click"] as const) {
+    head.addEventListener(
+      type,
+      (e) => {
+        if (!playingKeys()) return;
+        e.preventDefault();
+        e.stopPropagation();
+      },
+      { capture: true, passive: false },
+    );
+  }
 
   let base = 48;
   function layout() {
