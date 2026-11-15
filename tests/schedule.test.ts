@@ -28,8 +28,8 @@ describe("pattern mode", () => {
   it("loops one pattern", () => {
     const p = demoProject();
     const beat = pat(p, "Beat").id;
-    expect(patternEventsAtStep(p, beat, 12).drums.map((d) => d.sound)).toEqual(["snare", "chat", "clap"]);
-    expect(patternEventsAtStep(p, beat, 28).drums.map((d) => d.sound)).toEqual(["snare", "chat", "clap"]);
+    expect(patternEventsAtStep(p, beat, 12).drums.map((d) => d.sound)).toEqual(["snare808", "hat808", "clap808"]);
+    expect(patternEventsAtStep(p, beat, 28).drums.map((d) => d.sound)).toEqual(["snare808", "hat808", "clap808"]);
     expect(loopLength(p, "pattern", beat)).toBe(16);
   });
 
@@ -53,8 +53,8 @@ describe("song mode", () => {
   it("plays every clip under the playhead", () => {
     const p = demoProject();
     const at0 = songEventsAtStep(p, 0);
-    expect(at0.drums.map((d) => d.sound)).toEqual(["kick", "chat"]);
-    expect(at0.notes.map((x) => x.pitch)).toEqual([48]);
+    expect(at0.drums.map((d) => d.sound)).toEqual(["kick808", "hat808"]);
+    expect(at0.notes.map((x) => x.pitch)).toEqual([36]);
     // The hook only comes in on bar 3 (step 32).
     expect(songEventsAtStep(p, 2).notes.map((x) => x.pitch)).toEqual([]);
     expect(songEventsAtStep(p, 34).notes.map((x) => x.pitch)).toEqual([67]);
@@ -89,7 +89,7 @@ describe("mute and solo", () => {
     let p = demoProject();
     const snare = drumChannels(p)[1]!.id;
     p = setChannelMix(p, snare, { muted: true });
-    expect(songEventsAtStep(p, 12).drums.map((d) => d.sound)).toEqual(["chat", "clap"]);
+    expect(songEventsAtStep(p, 12).drums.map((d) => d.sound)).toEqual(["hat808", "clap808"]);
   });
 
   it("plays only soloed channels once any is soloed, and mute beats solo", () => {
@@ -99,7 +99,7 @@ describe("mute and solo", () => {
     p = setChannelMix(p, kick, { solo: true });
     p = setChannelMix(p, bass, { solo: true });
     expect([...audibleChannels(p)].sort()).toEqual([kick, bass].sort());
-    expect(songEventsAtStep(p, 0).drums.map((d) => d.sound)).toEqual(["kick"]);
+    expect(songEventsAtStep(p, 0).drums.map((d) => d.sound)).toEqual(["kick808"]);
     p = setChannelMix(p, kick, { muted: true });
     expect(audibleChannels(p).has(kick)).toBe(false);
   });
@@ -124,6 +124,6 @@ describe("drum rows follow channels", () => {
     const id = p.patterns[0]!.id;
     const tom = drumChannels(p)[5]!.id;
     p = setDrumStep(p, id, tom, 3, true);
-    expect(patternEventsAtStep(p, id, 3).drums).toEqual([{ channelId: tom, sound: "tom" }]);
+    expect(patternEventsAtStep(p, id, 3).drums).toEqual([{ channelId: tom, sound: "rim" }]);
   });
 });

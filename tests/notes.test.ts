@@ -38,11 +38,12 @@ describe("note names", () => {
 });
 
 describe("piano roll range", () => {
-  it("spans four octaves from C2 to B5", () => {
-    expect(ROLL_ROWS).toBe(48);
-    expect(midiToName(ROLL_LOW)).toBe("C2");
+  it("spans five octaves from C1 to B5", () => {
+    expect(ROLL_ROWS).toBe(60);
+    expect(midiToName(ROLL_LOW)).toBe("C1");
     expect(midiToName(ROLL_HIGH)).toBe("B5");
-    expect(inRollRange(36)).toBe(true);
+    expect(inRollRange(24)).toBe(true);
+    expect(inRollRange(23)).toBe(false);
     expect(inRollRange(84)).toBe(false);
     expect(inRollRange(60.5)).toBe(false);
   });

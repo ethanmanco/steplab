@@ -49,8 +49,8 @@ const kick = (p: Project) => drumChannels(p)[0]!.id;
 describe("emptyProject", () => {
   it("has the standard channels, a drum loop and a melody placed at bar 1", () => {
     const p = emptyProject();
-    expect(drumChannels(p).map((c) => c.sound)).toEqual(["kick", "snare", "chat", "ohat", "clap", "tom"]);
-    expect(synthChannels(p).map((c) => c.sound)).toEqual(["lead", "bass"]);
+    expect(drumChannels(p).map((c) => c.sound)).toEqual(["kick808", "snare808", "hat808", "ohat808", "clap808", "rim"]);
+    expect(synthChannels(p).map((c) => c.sound)).toEqual(["lead", "b808"]);
     expect(p.patterns.map((x) => x.kind)).toEqual(["drums", "melody"]);
     expect(p.clips.map((c) => [c.track, c.start, c.length])).toEqual([[0, 0, 16], [1, 0, 16]]);
     expect(p).toMatchObject({ version: 3, timeSig: { beats: 4, unit: 4 }, swing: 0, tracks: 8 });
@@ -74,15 +74,15 @@ describe("channels", () => {
     p = renameChannel(p, "x1", "  Rim  ");
     expect(p.channels.at(-1)!.name).toBe("Rim");
     expect(renameChannel(p, "x1", "   ")).toBe(p);
-    p = setChannelSound(p, "x1", "clap");
-    expect(p.channels.at(-1)).toMatchObject({ sound: "clap", name: "Rim" });
+    p = setChannelSound(p, "x1", "cowbell");
+    expect(p.channels.at(-1)).toMatchObject({ sound: "cowbell", name: "Rim" });
   });
 
   it("renames a channel that still had its sound's name", () => {
     const p = addChannel(emptyProject(), synthChannel("lead", undefined, "s1"));
     expect(setChannelSound(p, "s1", "pad").channels.at(-1)).toMatchObject({ sound: "pad", name: "Pad" });
     // A drum channel cannot take a synth sound.
-    expect(setChannelSound(p, kick(p), "pad").channels[0]!.sound).toBe("kick");
+    expect(setChannelSound(p, kick(p), "pad").channels[0]!.sound).toBe("kick808");
   });
 
   it("sets volume, mute and solo, clamping volume", () => {

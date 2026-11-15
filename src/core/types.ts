@@ -1,7 +1,11 @@
-export const DRUM_IDS = ["kick", "snare", "chat", "ohat", "clap", "tom"] as const;
+/** The first kit, kept in this order for older files. */
+export const CLASSIC_DRUMS = ["kick", "snare", "chat", "ohat", "clap", "tom"] as const;
+/** Sounds modeled on the Roland TR-808 drum machine, all synthesized. */
+export const DRUMS_808 = ["kick808", "snare808", "hat808", "ohat808", "clap808", "tom808", "rim", "cowbell"] as const;
+export const DRUM_IDS = [...CLASSIC_DRUMS, ...DRUMS_808] as const;
 export type DrumId = (typeof DRUM_IDS)[number];
 
-export const SYNTH_IDS = ["lead", "bass", "pluck", "pad"] as const;
+export const SYNTH_IDS = ["lead", "bass", "b808", "pluck", "pad"] as const;
 export type SynthId = (typeof SYNTH_IDS)[number];
 
 /** Beats per bar over the note value that gets the beat: 4/4, 3/4, 6/8, 7/8... */

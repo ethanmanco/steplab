@@ -14,6 +14,7 @@ import {
 } from "./project";
 import { MAX_STEPS, clampBars, clampBpm, clampSwing, clampTimeSig, stepsPerBar } from "./timing";
 import {
+  CLASSIC_DRUMS,
   DRUM_IDS,
   SYNTH_IDS,
   type Channel,
@@ -101,12 +102,13 @@ const V1_SYNTHS: Record<SynthId, { base: number; gate: number }> = {
   bass: { base: 36, gate: 1 },
   pluck: { base: 60, gate: 2 },
   pad: { base: 48, gate: 4 },
+  b808: { base: 36, gate: 1 },
 };
 
 function readOld(data: Raw): OldSong {
   const v1 = data.version === 1;
   const rawDrums = list(data.drums).filter(isObject);
-  const drums = DRUM_IDS.map((id) => {
+  const drums = CLASSIC_DRUMS.map((id) => {
     const raw = rawDrums.find((d) => d.id === id) ?? {};
     const steps = v1
       ? list(raw.steps).flatMap((v, i) => (v === true || v === 1 ? [i] : [])).filter(isStep)

@@ -30,7 +30,18 @@ export const DRUM_NAMES: Record<DrumId, string> = {
   ohat: "Open hat",
   clap: "Clap",
   tom: "Tom",
+  kick808: "808 Kick",
+  snare808: "808 Snare",
+  hat808: "808 Closed hat",
+  ohat808: "808 Open hat",
+  clap808: "808 Clap",
+  tom808: "808 Tom",
+  rim: "Rimshot",
+  cowbell: "Cowbell",
 };
+
+/** The drum channels a new song starts with: an 808 kit. */
+export const DEFAULT_KIT: readonly DrumId[] = ["kick808", "snare808", "hat808", "ohat808", "clap808", "rim"];
 
 export const DEFAULT_VOLUME = 0.8;
 export const DEFAULT_VELOCITY = 0.8;
@@ -82,7 +93,7 @@ function newMelodyPattern(name: string, channelId: string, bars = 1): MelodyPatt
 }
 
 function defaultChannels(): Channel[] {
-  return [...DRUM_IDS.map((d) => drumChannel(d)), synthChannel("lead"), synthChannel("bass")];
+  return [...DEFAULT_KIT.map((d) => drumChannel(d)), synthChannel("lead"), synthChannel("b808")];
 }
 
 /** A fresh song: the standard channels, one drum loop and one melody, both placed at bar 1. */
@@ -113,15 +124,15 @@ export function demoProject(): Project {
   const channels = defaultChannels();
   const byDrum = (d: DrumId) => channels.find((c) => c.kind === "drum" && c.sound === d)!.id;
   const lead = channels.find((c) => c.kind === "synth" && c.sound === "lead")!.id;
-  const bassCh = channels.find((c) => c.kind === "synth" && c.sound === "bass")!.id;
+  const bassCh = channels.find((c) => c.kind === "synth" && c.sound === "b808")!.id;
   const beat: DrumPattern = {
     ...newDrumPattern("Beat"),
     rows: {
-      [byDrum("kick")]: [0, 6, 8],
-      [byDrum("snare")]: [4, 12],
-      [byDrum("chat")]: [0, 2, 4, 6, 8, 10, 12],
-      [byDrum("ohat")]: [14],
-      [byDrum("clap")]: [12],
+      [byDrum("kick808")]: [0, 6, 8],
+      [byDrum("snare808")]: [4, 12],
+      [byDrum("hat808")]: [0, 2, 4, 6, 8, 10, 12],
+      [byDrum("ohat808")]: [14],
+      [byDrum("clap808")]: [12],
     },
   };
   const hook: MelodyPattern = {
@@ -130,7 +141,7 @@ export function demoProject(): Project {
   };
   const bass: MelodyPattern = {
     ...newMelodyPattern("Bassline", bassCh),
-    notes: [note(0, 48, 2), note(3, 48, 2), note(6, 51, 3), note(10, 55, 3), note(14, 53, 2)],
+    notes: [note(0, 36, 3), note(3, 36, 2), note(6, 39, 3), note(10, 43, 3), note(14, 41, 2)],
   };
   return {
     version: 3,

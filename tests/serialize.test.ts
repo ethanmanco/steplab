@@ -42,7 +42,7 @@ describe("version 3 files", () => {
   it("drop clips, rows and channels that do not add up", () => {
     const p = demoProject();
     const raw = JSON.parse(serializeProject(p));
-    raw.channels.push({ id: "bad", kind: "drum", sound: "cowbell" });
+    raw.channels.push({ id: "bad", kind: "drum", sound: "agogo" });
     raw.channels.push({ ...raw.channels[0] });
     raw.patterns[0].rows.ghost = [1, 2];
     raw.patterns[0].rows[raw.channels[0].id].push(-1, 9999, 2.5);

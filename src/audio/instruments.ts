@@ -28,7 +28,42 @@ function wrap(synth: Tone.PolySynth, chain: Tone.ToneAudioNode[] = []): Instrume
   };
 }
 
+/**
+ * An 808 bass: one sine voice with a quick pitch drop for the knock at the
+ * start, a long body, and a little saturation so it is heard on small
+ * speakers. Like the original it is monophonic: a new note cuts the last one.
+ */
+function bass808(): Instrument {
+  const synth = new Tone.MembraneSynth({
+    pitchDecay: 0.035,
+    octaves: 1.3,
+    oscillator: { type: "sine" },
+    envelope: { attack: 0.003, decay: 1.4, sustain: 0.55, release: 0.3 },
+    volume: -1,
+  });
+  const drive = new Tone.Distortion({ distortion: 0.35, wet: 0.35 });
+  const filter = new Tone.Filter({ type: "lowpass", frequency: 1400, Q: 0.5 });
+  synth.chain(drive, filter);
+  let held: number | null = null;
+  return {
+    output: filter,
+    play: (midi, seconds, time, velocity) => synth.triggerAttackRelease(midiToFreq(midi), seconds, time, velocity),
+    attack: (midi, time, velocity) => {
+      held = midi;
+      synth.triggerAttack(midiToFreq(midi), time, velocity);
+    },
+    release: (midi, time) => {
+      // Only the most recent key ends the note, so playing legato never cuts the newest one.
+      if (held === midi) synth.triggerRelease(time);
+    },
+    releaseAll: (time) => synth.triggerRelease(time),
+    dispose: () => [synth, drive, filter].forEach((n) => n.dispose()),
+  };
+}
+
 const builders: Record<SynthId, () => Instrument> = {
+  b808: bass808,
+
   // Detuned saws through a low-pass filter: bright but not harsh.
   lead: () =>
     wrap(
@@ -40,20 +75,21 @@ const builders: Record<SynthId, () => Instrument> = {
       [new Tone.Filter({ type: "lowpass", frequency: 2800, Q: 1 })],
     ),
 
-  // A square wave with a quick filter sweep on every note.
+  // A warm sawtooth with a gentle filter sweep. Less resonance than before,
+  // so it thumps instead of bleeping.
   bass: () =>
     wrap(
       new Tone.PolySynth(Tone.MonoSynth, {
-        oscillator: { type: "square" },
-        filter: { type: "lowpass", Q: 2, rolloff: -24 },
-        envelope: { attack: 0.003, decay: 0.2, sustain: 0.6, release: 0.08 },
+        oscillator: { type: "sawtooth" },
+        filter: { type: "lowpass", Q: 0.8, rolloff: -24 },
+        envelope: { attack: 0.004, decay: 0.3, sustain: 0.75, release: 0.12 },
         filterEnvelope: {
-          attack: 0.002,
-          decay: 0.18,
-          sustain: 0.25,
-          release: 0.1,
-          baseFrequency: 110,
-          octaves: 3.2,
+          attack: 0.003,
+          decay: 0.3,
+          sustain: 0.35,
+          release: 0.15,
+          baseFrequency: 80,
+          octaves: 2.4,
         },
         volume: -8,
       }),

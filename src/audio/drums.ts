@@ -1,5 +1,6 @@
 import * as Tone from "tone";
 import type { DrumId } from "../core/types";
+import { clap808, closedHat808, cowbell808, kick808, openHat808, rim808, snare808, tom808 } from "./drums808";
 
 /**
  * Every drum is synthesized here: no samples, so nothing to license and
@@ -144,5 +145,21 @@ export function createDrumVoice(id: DrumId): DrumVoice {
       return clap();
     case "tom":
       return tom();
+    case "kick808":
+      return kick808();
+    case "snare808":
+      return snare808();
+    case "hat808":
+      return closedHat808();
+    case "ohat808":
+      return openHat808();
+    case "clap808":
+      return clap808();
+    case "tom808":
+      return tom808();
+    case "rim":
+      return rim808();
+    case "cowbell":
+      return cowbell808();
   }
 }

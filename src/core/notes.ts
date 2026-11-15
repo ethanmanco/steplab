@@ -1,7 +1,7 @@
 import type { SynthId } from "./types";
 
-/** The piano roll spans four octaves, C2 up to B5. */
-export const ROLL_LOW = 36;
+/** The piano roll spans five octaves, C1 up to B5, so 808 bass lines fit. */
+export const ROLL_LOW = 24;
 export const ROLL_HIGH = 83;
 export const ROLL_ROWS = ROLL_HIGH - ROLL_LOW + 1;
 
@@ -14,6 +14,7 @@ export interface SynthInfo {
 export const SYNTHS: Record<SynthId, SynthInfo> = {
   lead: { name: "Lead", home: 67 },
   bass: { name: "Bass", home: 43 },
+  b808: { name: "808", home: 36 },
   pluck: { name: "Pluck", home: 67 },
   pad: { name: "Pad", home: 60 },
 };

@@ -22,6 +22,8 @@ export interface Graph {
   dispose(): void;
 }
 
+const CHOKES: Partial<Record<string, string>> = { chat: "ohat", hat808: "ohat808" };
+
 /** Notes end a hair before their last step so repeated notes stay distinct. */
 const NOTE_FILL = 0.92;
 
@@ -70,8 +72,9 @@ export function createGraph(project: Project): Graph {
     play(p, events, step, time) {
       const at = time + swingDelay(step, p.swing, p.bpm);
       for (const hit of events.drums) {
-        // A closed hat chokes every ringing open hat, like on a real kit.
-        if (hit.sound === "chat") slots.forEach((s) => s.sound === "ohat" && s.drum?.choke?.(at));
+        // A closed hat chokes every ringing open hat of its kit, like on a real machine.
+        const choked = CHOKES[hit.sound];
+        if (choked) slots.forEach((s) => s.sound === choked && s.drum?.choke?.(at));
         slots.get(hit.channelId)?.drum?.trigger(at);
       }
       const stepSec = secondsPerStep(p.bpm);

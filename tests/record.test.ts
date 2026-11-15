@@ -77,7 +77,8 @@ describe("computer keyboard piano", () => {
     expect(shiftOctave(48, 1)).toBe(60);
     expect(shiftOctave(60, 1)).toBe(60);
     expect(shiftOctave(48, -1)).toBe(36);
-    expect(shiftOctave(36, -1)).toBe(36);
+    expect(shiftOctave(36, -1)).toBe(24);
+    expect(shiftOctave(24, -1)).toBe(24);
   });
 });
 
