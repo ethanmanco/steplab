@@ -8,7 +8,8 @@ A small beat maker that runs in the browser, built around the core of FL Studio:
 
 ## What you can do
 
-- **Channels:** every sound is a channel with its own name, mute, solo, volume fader and a box for an exact volume percent. Start with six drums (kick, snare, closed hat, open hat, clap, tom) plus a Lead and a Bass, and add as many drum or synth channels as you like. Click a name to rename it; change its sound from the list.
+- **Channels:** every sound is a channel with its own name, mute, solo, volume fader and a box for an exact volume percent. New songs start with an 808 kit plus a Lead and an 808 bass, and you can add as many drum or synth channels as you like. Click a name to rename it; change its sound from the list.
+- **Sounds:** an 808 kit (kick, snare, closed and open hats, clap, tom, rimshot, cowbell), a classic kit (kick, snare, hats, clap, tom), and five synths: Lead, Bass, 808, Pluck and Pad. **Add 808 kit** drops the whole 808 set into any song.
 - **Patterns:** make as many **drum loops** and **melodies** as you need, each with its own name and length. Copy one to make a variation.
 - **Playlist:** the whole song at a glance. Every pattern you place shows up as a clip with a small picture of its notes. Drag clips to move them between bars and tracks, drag the right edge to repeat them longer, right-click to delete. Click an empty spot to place the selected pattern there.
 - **Editor windows:** double-click a clip and its editor opens in a window over the playlist, like FL Studio. Drum loops open in a step sequencer: click a step, or drag across steps to paint or erase. Melodies open in a four octave piano roll: click to place a note, drag right to make it longer, click a note to delete it, stack notes for chords. Drag windows by their title bar and resize them from the corner.
@@ -16,6 +17,8 @@ A small beat maker that runs in the browser, built around the core of FL Studio:
 - **Record:** play notes on a MIDI keyboard or your computer keyboard while the music plays. Notes land in the open melody where you played them, snapped to 1/16, 1/8 or 1/4 notes, with the length you held them. A one bar count-in and a metronome help you come in on time.
 - **Any meter:** type in the tempo (60 to 180 BPM) and the time signature (any number of beats over 4 or 8, such as 3/4, 6/8 or 7/8). Patterns can be up to 16 bars of 4/4 and songs up to 128.
 - **Feel:** swing pushes every second sixteenth late, up to a triplet shuffle.
+- **Layout:** **Auto** sizes the sidebar to fit and shrink-wraps editor windows to what they show. **Manual** lets you drag the divider between the sidebar and the playlist, the playlist's bottom edge, and the corner of each window. Dragging the divider switches to Manual; double-clicking it goes back to Auto.
+- **FL Studio shortcuts:** Space, R, L, Alt-drag, Ctrl+B and the rest work the way FL users expect. Press F1 for the list.
 - **Undo and redo** for every change. A whole recording take undoes in one step.
 - **Save:** your song autosaves in the browser. Save and Open move it in and out as a JSON file. Files from earlier versions open as a song with their loop already placed.
 - **Export:** WAV renders the song, or just the current pattern in PAT mode, to a file that loops seamlessly in other music apps.
@@ -31,20 +34,30 @@ A small beat maker that runs in the browser, built around the core of FL Studio:
 
 ### Keyboard
 
+Steplab follows FL Studio shortcuts where it can. Press `F1` in the app for this list.
+
 | Key | Action |
 | --- | --- |
-| `P` or `Space` | Play or pause (`Space` toggles a step when a grid square has focus) |
-| `Esc` | Stop and go back to the start (inside a window, close it) |
-| `Shift` + `R` | Turn recording on or off |
-| `Z` to `M` and `Q` to `U` | Play notes, laid out like piano keys (`S`, `D`, `G`, `H`, `J` and `2`, `3`, `5`, `6`, `7` are the black keys) |
-| `-` and `=` | Move the computer keyboard down or up an octave |
-| Arrow keys in an editor | Move between steps |
-| `Space` or `Enter` in an editor | Turn the focused step or note on or off |
-| `Shift` + Left or Right on a note | Make it shorter or longer |
-| Arrow keys on a clip | Move it a bar (with `Shift`, a beat) or a track |
-| `[` and `]` on a clip | Make it shorter or longer |
-| `Enter`, `Delete`, `Ctrl` + `D` on a clip | Edit, delete, duplicate |
-| `Ctrl` + `Z`, `Ctrl` + `Shift` + `Z` | Undo, redo |
+| `Space` | Play, or stop and go back to the start (`Space` toggles a step when a grid square has focus) |
+| `Ctrl` + `Space` | Play or pause |
+| `Esc` | Stop (inside a window, close it) |
+| `R` | Record on or off (`Shift` + `R` while computer keys are on, since `R` then plays a note) |
+| `L` | Switch between Pattern and Song mode |
+| Numpad `+` / `-` | Next or previous pattern |
+| `Ctrl` + `S`, `Ctrl` + `O`, `Ctrl` + `R` | Save, open, export WAV |
+| `Ctrl` + `Z` (or `Ctrl` + `Alt` + `Z`), `Ctrl` + `Y` | Undo, redo |
+| `F5`, `F6`, `F7`, `F1` | Playlist, channel rack, piano roll, shortcut list |
+| `Alt` + drag in the playlist | Move or stretch a clip without snapping |
+| `Ctrl` + `B` on a clip | Duplicate it after itself |
+| `Ctrl` + `C`, `Ctrl` + `V` on a clip | Copy, then paste after the selected clip |
+| `Ctrl` + `D` | Deselect |
+| `Delete`, `Enter` on a clip | Delete it, edit its pattern |
+| Arrow keys on a clip | Move by the snap size or a track (`Shift`: one step) |
+| `[` and `]` on a clip | Shorter or longer |
+| `Ctrl` + mouse wheel | Zoom the playlist |
+| Right-click | Delete a clip, note or step (drag to delete more) |
+| `Z` to `M` and `Q` to `U` | Play notes, laid out like piano keys (`-` and `=` change octave) |
+| Arrow keys, `Space`, `Shift` + Left/Right in an editor | Move, toggle a step or note, change a note's length |
 
 Clips are real buttons, and the playlist has a toolbar (Edit, Copy, Delete, move and length buttons) for touch screens and screen readers. Each editor grid is a single Tab stop, and every square has a spoken label such as "Kick, bar 2, step 5, on" or "C sharp 4, step 9, note, 3 steps long".
 
@@ -52,7 +65,7 @@ Clips are real buttons, and the playlist has a toolbar (Edit, Copy, Delete, move
 
 - **Vite + TypeScript**, with plain DOM code and no UI framework. A small element helper and a tiny store do the job. The grids only touch the squares that changed, so even a 16 bar piano roll (over 12,000 buttons) rebuilds in about 60 ms and a single edit takes about 1 ms. Playlist clips draw their note pictures once as SVG and tile them.
 - **[Tone.js](https://tonejs.github.io/)** for audio scheduling and synthesis.
-- **Every sound is synthesized in code.** There are no audio samples, so there are no licensing questions. The kick is a pitch-swept sine with a noise click, hats are FM metal synths through a high-pass filter, the clap is three quick noise bursts plus a tail, and the melody sounds are polyphonic subtractive and FM synths.
+- **Every sound is synthesized in code.** There are no audio samples, so there are no licensing questions. The Roland TR-808 made its sounds with analog circuits rather than recordings, so its recipes translate directly: the 808 kick is a sine that drops in pitch over a long decay, the snare is two tuned tones plus filtered noise, the cowbell is two square waves at 540 and 800 Hz through a band-pass filter, and the 808 bass is a sine with a short pitch "knock", a long body and a little saturation so it carries on small speakers. The melody sounds are polyphonic subtractive and FM synths.
 - **Web MIDI** for keyboards, in Chrome, Edge and Firefox (Safari does not support it).
 - **Vitest** for the timing, pattern, recording, file, MIDI and WAV logic.
 
