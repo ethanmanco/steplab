@@ -4,7 +4,7 @@ A small beat maker that runs in the browser, built around the core of FL Studio:
 
 **Try it:** https://ethanmanco.github.io/steplab/
 
-![Steplab: patterns and channels on the left, a four track playlist with drum, bass, hook and pad clips, and the piano roll open over it](docs/screenshot.jpg)
+![Steplab: patterns and channels on the left and a four track playlist with drum, bass, hook and pad clips, over a black starfield](docs/screenshot.jpg)
 
 ## What you can do
 
@@ -98,7 +98,7 @@ Projects are versioned JSON tagged with `"app": "steplab"`. Opening a file repai
 - Real buttons, labels, roving focus, visible focus rings and a status message for each action.
 - `prefers-reduced-motion` turns off every transition and the blinking record light.
 - On small screens the sidebar sits above the playlist, editor windows fill the screen, grids scroll sideways with their names pinned, and touch targets are at least 40 px. Tapping toggles or selects; dragging scrolls. Clips move with the toolbar buttons instead of dragging.
-- A deep-space theme: two seeded star layers painted once on canvases and drifting very slowly at different speeds, a faint galaxy band, colored nebula light, a ringed planet rising in the corner and a few stars that twinkle, all behind frosted glass panels. With reduced motion turned on, the sky holds still.
+- A sleek black theme with a still starfield in the style of a Hubble deep field: faint stars in slightly different colors, a few bright ones with four-point diffraction spikes, and tiny smudges of distant galaxies, painted once on a canvas from a seeded random generator. Panels are dark glass with hairline edges, and color is saved for the sounds themselves.
 
 ## Project layout
 
