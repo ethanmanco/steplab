@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultBeat } from "../src/core/presets";
 import {
   addClip,
   addSample,
@@ -8,7 +9,6 @@ import {
   setChannelTone,
   setMaster,
   addNote,
-  demoProject,
   drumChannels,
   emptyProject,
   setChannelMix,
@@ -28,7 +28,7 @@ function parseOk(text: string) {
 
 describe("version 3 files", () => {
   it("round trip a song exactly", () => {
-    let p = demoProject();
+    let p = defaultBeat();
     p = setTimeSig(p, { beats: 7, unit: 8 });
     p = setSwing(p, 0.35);
     p = setChannelMix(p, drumChannels(p)[3]!.id, { volume: 0.25, muted: true, solo: true });
@@ -46,7 +46,7 @@ describe("version 3 files", () => {
   });
 
   it("drop clips, rows and channels that do not add up", () => {
-    const p = demoProject();
+    const p = defaultBeat();
     const raw = JSON.parse(serializeProject(p));
     raw.channels.push({ id: "bad", kind: "drum", sound: "agogo" });
     raw.channels.push({ ...raw.channels[0] });
@@ -62,7 +62,7 @@ describe("version 3 files", () => {
   });
 
   it("move melodies on unknown channels to the first synth", () => {
-    const p = demoProject();
+    const p = defaultBeat();
     const raw = JSON.parse(serializeProject(p));
     raw.patterns[1].channelId = "missing";
     const q = parseOk(JSON.stringify(raw));
@@ -70,7 +70,7 @@ describe("version 3 files", () => {
   });
 
   it("always keep at least one synth channel and grow tracks to fit clips", () => {
-    const raw = JSON.parse(serializeProject(demoProject()));
+    const raw = JSON.parse(serializeProject(defaultBeat()));
     raw.channels = raw.channels.filter((c: { kind: string }) => c.kind === "drum");
     raw.tracks = 2;
     const q = parseOk(JSON.stringify(raw));
@@ -139,7 +139,7 @@ describe("older files become a song", () => {
 
 describe("version 4 sound settings and samples", () => {
   it("round trip tone, effects, pan, master and samples, with embedded audio", () => {
-    let p = demoProject();
+    let p = defaultBeat();
     const lead = synthChannels(p)[0]!.id;
     p = setChannelTone(p, lead, { cutoff: 0.4, resonance: 0.3, octave: -1, glide: 0.2 });
     p = setChannelFx(p, lead, { low: -3, high: 4.5, comp: 0.5, reverb: 0.3, delay: 0.2 });
@@ -155,7 +155,7 @@ describe("version 4 sound settings and samples", () => {
   });
 
   it("fill missing version 3 fields with defaults", () => {
-    const raw = JSON.parse(serializeProject(demoProject()));
+    const raw = JSON.parse(serializeProject(defaultBeat()));
     raw.version = 3;
     delete raw.master;
     delete raw.samples;
@@ -171,7 +171,7 @@ describe("version 4 sound settings and samples", () => {
   });
 
   it("refuse unsafe bundled paths, unknown sample references and junk audio", () => {
-    const raw = JSON.parse(serializeProject(demoProject()));
+    const raw = JSON.parse(serializeProject(defaultBeat()));
     raw.samples = [
       { id: "x", name: "Bad", source: "bundled", url: "../secret" },
       { id: "y", name: "Ok", source: "user", root: 999 },

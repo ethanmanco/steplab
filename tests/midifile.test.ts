@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultBeat } from "../src/core/presets";
 import {
   GM_DRUM,
   PPQ,
@@ -12,7 +13,7 @@ import {
   synthForProgram,
   type MidiSong,
 } from "../src/core/midifile";
-import { addNote, demoProject, emptyProject, findPattern, songSteps } from "../src/core/project";
+import { addNote, emptyProject, findPattern, songSteps } from "../src/core/project";
 import type { DrumPattern, MelodyPattern } from "../src/core/types";
 
 const ascii = (b: Uint8Array, at: number) => String.fromCharCode(...b.subarray(at, at + 4));
@@ -112,29 +113,30 @@ describe("General MIDI mapping", () => {
 
 describe("projectToMidi", () => {
   it("lays out the whole song with drums on channel 10", () => {
-    const p = demoProject();
+    const p = defaultBeat();
     const song = projectToMidi(p);
     const drums = song.tracks.find((t) => t.channel === 9)!;
-    // The one-bar beat repeats across its four-bar clip: three kicks a bar.
-    expect(drums.notes.filter((n) => n.pitch === 36)).toHaveLength(12);
-    const hook = song.tracks.find((t) => t.name === "Lead")!;
-    // The hook starts on bar 3, step 2.
-    expect(hook.notes[0]!.tick).toBe((32 + 2) * TICKS_PER_STEP);
+    // The two bar beat plays three times across its six bar clip: seven kicks each time.
+    expect(drums.notes.filter((n) => n.pitch === 36)).toHaveLength(21);
+    const bass = song.tracks.find((t) => t.name === "808")!;
+    // The 808 drops in on bar 3.
+    expect(bass.notes[0]!.tick).toBe(32 * TICKS_PER_STEP);
     expect(Math.max(...song.tracks.flatMap((t) => t.notes.map((n) => n.tick + n.duration)))).toBeLessThanOrEqual(songSteps(p) * TICKS_PER_STEP);
   });
 
   it("exports one pattern on its own from tick 0", () => {
-    const p = demoProject();
-    const hook = p.patterns.find((x) => x.name === "Hook")!;
-    const song = projectToMidi(p, hook.id);
+    const p = defaultBeat();
+    // In the song the 808 starts on bar 3; on its own it starts at once.
+    const bass = p.patterns.find((x) => x.name === "808")!;
+    const song = projectToMidi(p, bass.id);
     expect(song.tracks).toHaveLength(1);
-    expect(song.tracks[0]!.notes[0]!.tick).toBe(2 * TICKS_PER_STEP);
+    expect(song.tracks[0]!.notes[0]!.tick).toBe(0);
   });
 });
 
 describe("importMidi", () => {
   it("brings melodies and drums back as placed patterns", () => {
-    const src = demoProject();
+    const src = defaultBeat();
     const bytes = encodeMidi(projectToMidi(src, src.patterns.find((x) => x.name === "Hook")!.id));
     const base = emptyProject();
     const { project, patternIds, skipped } = importMidi(base, decodeMidi(bytes), "clip");
@@ -143,7 +145,7 @@ describe("importMidi", () => {
     const mel = findPattern(project, patternIds[0]!) as MelodyPattern;
     const orig = src.patterns.find((x) => x.name === "Hook") as MelodyPattern;
     expect(mel.notes.map((n) => [n.step, n.pitch, n.length])).toEqual(orig.notes.map((n) => [n.step, n.pitch, n.length]));
-    expect(project.channels.find((c) => c.id === mel.channelId)).toMatchObject({ kind: "synth", sound: "lead" });
+    expect(project.channels.find((c) => c.id === mel.channelId)).toMatchObject({ kind: "synth", sound: "piano" });
     expect(project.clips.some((c) => c.patternId === mel.id && c.start === 0)).toBe(true);
   });
 

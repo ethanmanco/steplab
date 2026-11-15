@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { defaultBeat } from "../src/core/presets";
 import {
   addClip,
   addNote,
-  demoProject,
   drumChannels,
   emptyProject,
   setChannelMix,
@@ -26,38 +26,40 @@ const pat = (p: Project, name: string) => p.patterns.find((x) => x.name === name
 
 describe("pattern mode", () => {
   it("loops one pattern", () => {
-    const p = demoProject();
+    const p = defaultBeat();
     const beat = pat(p, "Beat").id;
-    expect(patternEventsAtStep(p, beat, 12).drums.map((d) => d.sound)).toEqual(["snare808", "hat808", "clap808"]);
-    expect(patternEventsAtStep(p, beat, 28).drums.map((d) => d.sound)).toEqual(["snare808", "hat808", "clap808"]);
-    expect(loopLength(p, "pattern", beat)).toBe(16);
+    expect(patternEventsAtStep(p, beat, 8).drums.map((d) => d.sound)).toEqual(["snare808", "hat808", "clap808"]);
+    expect(patternEventsAtStep(p, beat, 40).drums.map((d) => d.sound)).toEqual(["snare808", "hat808", "clap808"]);
+    expect(loopLength(p, "pattern", beat)).toBe(32);
   });
 
   it("plays a melody through its channel with pitch, velocity and length", () => {
-    const p = demoProject();
+    const p = defaultBeat();
     const hook = pat(p, "Hook") as MelodyPattern;
-    expect(patternEventsAtStep(p, hook.id, 2).notes).toEqual([
-      { channelId: hook.channelId, pitch: 67, velocity: 0.8, steps: 2 },
+    expect(patternEventsAtStep(p, hook.id, 4).notes).toEqual([
+      { channelId: hook.channelId, pitch: 79, velocity: 0.8, steps: 3 },
     ]);
-    expect(patternEventsAtStep(p, hook.id, 3).notes).toEqual([]);
+    expect(patternEventsAtStep(p, hook.id, 5).notes).toEqual([]);
   });
 
   it("falls back to the song when no pattern is chosen", () => {
-    const p = demoProject();
-    expect(loopLength(p, "pattern", null)).toBe(64);
+    const p = defaultBeat();
+    expect(loopLength(p, "pattern", null)).toBe(128);
     expect(eventsAt(p, "pattern", "missing", 0)).toEqual(songEventsAtStep(p, 0));
   });
 });
 
 describe("song mode", () => {
   it("plays every clip under the playhead", () => {
-    const p = demoProject();
+    const p = defaultBeat();
+    // Bars 1 and 2 are the piano hook and the pad on their own.
     const at0 = songEventsAtStep(p, 0);
-    expect(at0.drums.map((d) => d.sound)).toEqual(["kick808", "hat808"]);
-    expect(at0.notes.map((x) => x.pitch)).toEqual([36]);
-    // The hook only comes in on bar 3 (step 32).
-    expect(songEventsAtStep(p, 2).notes.map((x) => x.pitch)).toEqual([]);
-    expect(songEventsAtStep(p, 34).notes.map((x) => x.pitch)).toEqual([67]);
+    expect(at0.drums).toEqual([]);
+    expect(at0.notes.map((x) => x.pitch).sort()).toEqual([60, 63, 67, 72]);
+    // The drums and the 808 drop in on bar 3 (step 32).
+    const drop = songEventsAtStep(p, 32);
+    expect(drop.drums.map((d) => d.sound)).toEqual(["kick808", "hat808"]);
+    expect(drop.notes.map((x) => x.pitch).sort()).toEqual([36, 60, 63, 67, 72]);
   });
 
   it("repeats a pattern across a long clip and cuts notes at the clip end", () => {
@@ -71,35 +73,38 @@ describe("song mode", () => {
   });
 
   it("is silent past the clips and loops over whole bars", () => {
-    const p = demoProject();
-    expect(songEventsAtStep(p, 80)).toEqual({ drums: [], notes: [] });
-    expect(loopLength(p, "song", null)).toBe(64);
+    const p = defaultBeat();
+    expect(songEventsAtStep(p, 140)).toEqual({ drums: [], notes: [] });
+    expect(loopLength(p, "song", null)).toBe(128);
   });
 
   it("finds where a pattern plays at a song step", () => {
-    const p = demoProject();
-    const hook = pat(p, "Hook").id;
-    expect(clipAt(p, hook, 10)).toBeNull();
-    expect(clipAt(p, hook, 37)?.local).toBe(5);
+    const p = defaultBeat();
+    const beat = pat(p, "Beat").id;
+    expect(clipAt(p, beat, 10)).toBeNull();
+    expect(clipAt(p, beat, 37)?.local).toBe(5);
+    // Past the end of the two bar pattern, the clip loops it.
+    expect(clipAt(p, beat, 70)?.local).toBe(6);
   });
 });
 
 describe("mute and solo", () => {
   it("skips muted channels", () => {
-    let p = demoProject();
+    let p = defaultBeat();
     const snare = drumChannels(p)[1]!.id;
     p = setChannelMix(p, snare, { muted: true });
-    expect(songEventsAtStep(p, 12).drums.map((d) => d.sound)).toEqual(["hat808", "clap808"]);
+    expect(songEventsAtStep(p, 40).drums.map((d) => d.sound)).toEqual(["hat808", "clap808"]);
   });
 
   it("plays only soloed channels once any is soloed, and mute beats solo", () => {
-    let p = demoProject();
+    let p = defaultBeat();
     const kick = drumChannels(p)[0]!.id;
-    const bass = synthChannels(p)[1]!.id;
+    const bass = synthChannels(p).find((c) => c.sound === "b808")!.id;
     p = setChannelMix(p, kick, { solo: true });
     p = setChannelMix(p, bass, { solo: true });
     expect([...audibleChannels(p)].sort()).toEqual([kick, bass].sort());
-    expect(songEventsAtStep(p, 0).drums.map((d) => d.sound)).toEqual(["kick808"]);
+    expect(songEventsAtStep(p, 32).drums.map((d) => d.sound)).toEqual(["kick808"]);
+    expect(songEventsAtStep(p, 32).notes.map((x) => x.pitch)).toEqual([36]);
     p = setChannelMix(p, kick, { muted: true });
     expect(audibleChannels(p).has(kick)).toBe(false);
   });
@@ -130,33 +135,33 @@ describe("drum rows follow channels", () => {
 
 describe("backing layers in pattern mode", () => {
   it("plays the selected pattern together with its backing", () => {
-    const p = demoProject();
+    const p = defaultBeat();
     const hook = pat(p, "Hook").id;
     const beat = pat(p, "Beat").id;
-    const e = eventsAt(p, "pattern", hook, 12, [beat]);
-    expect(e.notes.map((x) => x.pitch)).toEqual([67]);
+    const e = eventsAt(p, "pattern", hook, 8, [beat]);
+    expect(e.notes.map((x) => x.pitch)).toEqual([74]);
     expect(e.drums.map((d) => d.sound)).toEqual(["snare808", "hat808", "clap808"]);
   });
 
   it("loops over the longest pattern, repeating shorter ones inside it", () => {
-    let p = demoProject();
+    let p = defaultBeat();
     const hook = pat(p, "Hook").id;
     const beat = pat(p, "Beat").id;
-    p = setPatternBars(p, beat, 2);
+    p = setPatternBars(p, hook, 1);
     expect(loopLength(p, "pattern", hook, [beat])).toBe(32);
-    // Step 18 is step 2 of the one-bar hook on its second pass.
-    expect(eventsAt(p, "pattern", hook, 18, [beat]).notes.map((x) => x.pitch)).toEqual([67]);
+    // Step 18 is step 2 of the now one-bar hook on its second pass.
+    expect(eventsAt(p, "pattern", hook, 18, [beat]).notes.map((x) => x.pitch)).toEqual([75]);
   });
 
   it("ignores missing layers and does not double the selected pattern", () => {
-    const p = demoProject();
+    const p = defaultBeat();
     const hook = pat(p, "Hook").id;
     expect(eventsAt(p, "pattern", hook, 2, [hook, "gone"])).toEqual(eventsAt(p, "pattern", hook, 2));
-    expect(loopLength(p, "pattern", hook, ["gone"])).toBe(16);
+    expect(loopLength(p, "pattern", hook, ["gone"])).toBe(64);
   });
 
   it("leaves song mode alone", () => {
-    const p = demoProject();
+    const p = defaultBeat();
     expect(eventsAt(p, "song", null, 0, [pat(p, "Hook").id])).toEqual(songEventsAtStep(p, 0));
   });
 });

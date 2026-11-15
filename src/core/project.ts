@@ -136,50 +136,6 @@ export function emptyProject(): Project {
   };
 }
 
-const note = (step: number, pitch: number, length: number): Note => ({ step, pitch, length, velocity: DEFAULT_VELOCITY });
-
-/** A short starter song: a beat and a bass line for four bars, with a hook coming in on bar 3. */
-export function demoProject(): Project {
-  const channels = defaultChannels();
-  const byDrum = (d: DrumId) => channels.find((c) => c.kind === "drum" && c.sound === d)!.id;
-  const lead = channels.find((c) => c.kind === "synth" && c.sound === "lead")!.id;
-  const bassCh = channels.find((c) => c.kind === "synth" && c.sound === "b808")!.id;
-  const beat: DrumPattern = {
-    ...newDrumPattern("Beat"),
-    rows: {
-      [byDrum("kick808")]: [0, 6, 8],
-      [byDrum("snare808")]: [4, 12],
-      [byDrum("hat808")]: [0, 2, 4, 6, 8, 10, 12],
-      [byDrum("ohat808")]: [14],
-      [byDrum("clap808")]: [12],
-    },
-  };
-  const hook: MelodyPattern = {
-    ...newMelodyPattern("Hook", lead),
-    notes: [note(2, 67, 2), note(4, 70, 2), note(7, 72, 3), note(10, 70, 2), note(12, 67, 4)],
-  };
-  const bass: MelodyPattern = {
-    ...newMelodyPattern("Bassline", bassCh),
-    notes: [note(0, 36, 3), note(3, 36, 2), note(6, 39, 3), note(10, 43, 3), note(14, 41, 2)],
-  };
-  return {
-    version: 4,
-    bpm: DEFAULT_BPM,
-    timeSig: { ...DEFAULT_TIME_SIG },
-    swing: 0,
-    channels,
-    patterns: [beat, bass, hook],
-    clips: [
-      { id: makeId("k"), patternId: beat.id, track: 0, start: 0, length: 64 },
-      { id: makeId("k"), patternId: bass.id, track: 1, start: 0, length: 64 },
-      { id: makeId("k"), patternId: hook.id, track: 2, start: 32, length: 32 },
-    ],
-    tracks: DEFAULT_TRACKS,
-    master: { ...DEFAULT_MASTER },
-    samples: [],
-  };
-}
-
 const sortSteps = (steps: number[]) => [...new Set(steps)].sort((a, b) => a - b);
 
 export const sortNotes = (notes: Note[]): Note[] =>

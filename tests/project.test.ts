@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultBeat } from "../src/core/presets";
 import {
   addChannel,
   addClip,
@@ -18,7 +19,6 @@ import {
   clearPattern,
   deleteClip,
   deletePattern,
-  demoProject,
   drumChannel,
   drumChannels,
   duplicateClip,
@@ -67,13 +67,13 @@ describe("emptyProject", () => {
   });
 
   it("gives every channel, pattern and clip its own id", () => {
-    const p = demoProject();
+    const p = defaultBeat();
     const ids = [...p.channels, ...p.patterns, ...p.clips].map((x) => x.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("starts the demo as a four bar song", () => {
-    expect(songSteps(demoProject())).toBe(64);
+  it("opens with an eight bar song", () => {
+    expect(songSteps(defaultBeat())).toBe(128);
   });
 });
 
@@ -291,10 +291,12 @@ describe("song settings", () => {
 
 describe("playsAlongside", () => {
   it("lists what overlaps the pattern's first clip in the song", () => {
-    const p = demoProject();
+    const p = defaultBeat();
     const id = (name: string) => p.patterns.find((x) => x.name === name)!.id;
-    // The hook comes in on bar 3, over the beat and the bass line.
-    expect(playsAlongside(p, id("Hook")).sort()).toEqual([id("Beat"), id("Bassline")].sort());
+    // The hook starts on bar 1, where only the pad plays with it.
+    expect(playsAlongside(p, id("Hook"))).toEqual([id("Pad")]);
+    // The beat comes in on bar 3, where the 808, the hook and the pad all play.
+    expect(playsAlongside(p, id("Beat")).sort()).toEqual([id("808"), id("Hook"), id("Pad")].sort());
   });
 
   it("falls back to the first drum loop when the pattern is not placed", () => {

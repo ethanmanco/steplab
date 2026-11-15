@@ -23,7 +23,6 @@ import {
   clearPattern,
   deleteClip,
   deletePattern,
-  demoProject,
   drumChannel,
   duplicateClip,
   duplicatePattern,
@@ -67,7 +66,7 @@ import { createShortcutsWindow } from "./ui/shortcuts";
 import { createChannelSettings, type LibrarySample } from "./ui/channelSettings";
 import { createMixer } from "./ui/mixer";
 import { createExamplesWindow } from "./ui/examples";
-import { PRESETS } from "./core/presets";
+import { PRESETS, defaultBeat } from "./core/presets";
 import { createSampleBank } from "./samples";
 import { createPlaylist } from "./ui/playlist";
 import { createSidebar } from "./ui/sidebar";
@@ -103,7 +102,7 @@ function cleanPrefs(p: Prefs): Prefs {
     backingLevel: Math.min(1, Math.max(0, Number.isFinite(p.backingLevel) ? p.backingLevel : 0.7)),
   };
 }
-const initialProject = loadAutosave(storage) ?? demoProject();
+const initialProject = loadAutosave(storage) ?? defaultBeat();
 let history: History<Project> = createHistory(initialProject);
 
 

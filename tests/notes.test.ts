@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { defaultBeat } from "../src/core/presets";
 import {
   ROLL_HIGH,
   ROLL_LOW,
@@ -10,8 +11,8 @@ import {
   midiToName,
   midiToSpoken,
 } from "../src/core/notes";
-import { demoProject } from "../src/core/project";
-import { SYNTH_IDS } from "../src/core/types";
+import { DRUM_IDS, SYNTH_IDS } from "../src/core/types";
+import css from "../src/styles/app.css?raw";
 
 describe("note names", () => {
   it("uses scientific pitch names", () => {
@@ -53,9 +54,13 @@ describe("piano roll range", () => {
   });
 
   it("keeps the demo melodies on the roll", () => {
-    for (const m of demoProject().patterns.flatMap((x) => (x.kind === "melody" ? [x] : []))) {
+    for (const m of defaultBeat().patterns.flatMap((x) => (x.kind === "melody" ? [x] : []))) {
       expect(m.notes.length).toBeGreaterThan(0);
       for (const n of m.notes) expect(inRollRange(n.pitch)).toBe(true);
     }
+  });
+
+  it("gives every sound a color in the channel rack and playlist", () => {
+    for (const id of [...DRUM_IDS, ...SYNTH_IDS]) expect(css, id).toContain(`[data-sound="${id}"] { --c:`);
   });
 });

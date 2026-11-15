@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { demoProject } from "../src/core/project";
+import { defaultBeat } from "../src/core/presets";
 import { PREFS_KEY, STORAGE_KEY, debounce, loadAutosave, loadPrefs, saveAutosave, savePrefs } from "../src/storage";
 
 function memoryStore() {
@@ -23,7 +23,7 @@ const throwing = {
 describe("autosave", () => {
   it("saves and loads a project", () => {
     const store = memoryStore();
-    const p = demoProject();
+    const p = defaultBeat();
     expect(saveAutosave(store, p)).toBe(true);
     expect(store.data.has(STORAGE_KEY)).toBe(true);
     expect(loadAutosave(store)).toEqual(p);
@@ -38,9 +38,9 @@ describe("autosave", () => {
 
   it("survives storage that throws or is missing", () => {
     expect(loadAutosave(throwing)).toBeNull();
-    expect(saveAutosave(throwing, demoProject())).toBe(false);
+    expect(saveAutosave(throwing, defaultBeat())).toBe(false);
     expect(loadAutosave(null)).toBeNull();
-    expect(saveAutosave(null, demoProject())).toBe(false);
+    expect(saveAutosave(null, defaultBeat())).toBe(false);
   });
 });
 
