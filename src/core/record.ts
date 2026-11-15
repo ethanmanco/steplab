@@ -7,6 +7,16 @@ export const QUANTIZE_OPTIONS = [
   { steps: 4, label: "1/4" },
 ] as const;
 
+/**
+ * Turn a position heard during playback (steps since Play, not wrapped) into
+ * a position inside the pattern being recorded. `loop` is how long the
+ * transport loops; the pattern repeats inside it from the loop start.
+ */
+export function positionInPattern(heard: number, loop: number, patternLength: number): number {
+  const inLoop = ((heard % loop) + loop) % loop;
+  return inLoop % patternLength;
+}
+
 /** Snap a played position to the nearest grid line, wrapping at the loop end. */
 export function quantizeStep(exactStep: number, grid: number, totalSteps: number): number {
   const snapped = Math.round(exactStep / grid) * grid;

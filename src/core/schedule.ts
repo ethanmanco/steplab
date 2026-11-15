@@ -87,18 +87,44 @@ export function songEventsAtStep(p: Project, step: number): StepEvents {
   return out;
 }
 
-/** How many steps the transport loops over in a mode. */
-export function loopLength(p: Project, mode: PlayMode, patternId: string | null): number {
+/** The patterns Pattern mode plays: the selected one plus any backing layers, each once. */
+function patternSet(p: Project, patternId: string | null, layers: readonly string[]): Pattern[] {
+  const ids = [patternId, ...layers].filter((id, i, all): id is string => !!id && all.indexOf(id) === i);
+  return ids.map((id) => findPattern(p, id)).filter((x): x is Pattern => !!x);
+}
+
+/**
+ * How many steps the transport loops over in a mode. In Pattern mode with
+ * backing layers it is the longest of them; shorter ones repeat inside it.
+ */
+export function loopLength(p: Project, mode: PlayMode, patternId: string | null, layers: readonly string[] = []): number {
   if (mode === "pattern") {
-    const pat = findPattern(p, patternId);
-    if (pat) return patternSteps(pat, p.timeSig);
+    const set = patternSet(p, patternId, layers);
+    if (set.length && findPattern(p, patternId)) return Math.max(...set.map((x) => patternSteps(x, p.timeSig)));
   }
   return songSteps(p);
 }
 
-export function eventsAt(p: Project, mode: PlayMode, patternId: string | null, step: number): StepEvents {
-  if (mode === "pattern" && findPattern(p, patternId)) return patternEventsAtStep(p, patternId!, step);
-  return songEventsAtStep(p, step);
+/**
+ * Everything that starts on a step. Pattern mode plays the selected pattern
+ * and any backing layers together (so you can hear the beat while you record
+ * a melody); Song mode plays the playlist.
+ */
+export function eventsAt(
+  p: Project,
+  mode: PlayMode,
+  patternId: string | null,
+  step: number,
+  layers: readonly string[] = [],
+): StepEvents {
+  if (mode !== "pattern" || !findPattern(p, patternId)) return songEventsAtStep(p, step);
+  const out: StepEvents = { drums: [], notes: [] };
+  for (const pat of patternSet(p, patternId, layers)) {
+    const e = patternEventsAtStep(p, pat.id, step);
+    out.drums.push(...e.drums);
+    out.notes.push(...e.notes);
+  }
+  return out;
 }
 
 /**

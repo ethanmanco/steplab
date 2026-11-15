@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createHistory, pushHistory, redo, undo, HISTORY_LIMIT } from "../src/core/history";
 import { KEYS_DEFAULT_BASE, keyOffset, keyToPitch, shiftOctave } from "../src/core/keymap";
-import { quantizeStep, recordedNote } from "../src/core/record";
+import { positionInPattern, quantizeStep, recordedNote } from "../src/core/record";
 
 describe("quantizeStep", () => {
   it("snaps to the nearest grid line", () => {
@@ -129,5 +129,18 @@ describe("history", () => {
     let big = createHistory(0);
     for (let i = 1; i <= HISTORY_LIMIT + 20; i++) big = pushHistory(big, i, null, i * 2000);
     expect(big.past).toHaveLength(HISTORY_LIMIT);
+  });
+});
+
+describe("positionInPattern", () => {
+  it("wraps a heard position into the pattern", () => {
+    expect(positionInPattern(3.5, 16, 16)).toBeCloseTo(3.5);
+    expect(positionInPattern(19.25, 16, 16)).toBeCloseTo(3.25);
+  });
+
+  it("follows a shorter pattern repeating inside a longer backing loop", () => {
+    // A one bar melody over a three bar backing: the melody restarts with the loop.
+    expect(positionInPattern(40, 48, 16)).toBe(8);
+    expect(positionInPattern(50, 48, 16)).toBe(2);
   });
 });

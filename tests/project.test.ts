@@ -18,6 +18,7 @@ import {
   findPattern,
   moveClip,
   nextName,
+  playsAlongside,
   noteAt,
   patternSteps,
   removeChannel,
@@ -276,5 +277,20 @@ describe("song settings", () => {
     expect(q.timeSig).toEqual({ beats: 12, unit: 4 });
     expect(drums(q).bars).toBe(5);
     expect(patternSteps(drums(q), q.timeSig)).toBe(240);
+  });
+});
+
+describe("playsAlongside", () => {
+  it("lists what overlaps the pattern's first clip in the song", () => {
+    const p = demoProject();
+    const id = (name: string) => p.patterns.find((x) => x.name === name)!.id;
+    // The hook comes in on bar 3, over the beat and the bass line.
+    expect(playsAlongside(p, id("Hook")).sort()).toEqual([id("Beat"), id("Bassline")].sort());
+  });
+
+  it("falls back to the first drum loop when the pattern is not placed", () => {
+    const p0 = emptyProject();
+    const { project, id } = addMelodyPattern(p0);
+    expect(playsAlongside(project, id)).toEqual([p0.patterns[0]!.id]);
   });
 });

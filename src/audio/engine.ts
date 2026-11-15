@@ -19,6 +19,7 @@ export class Engine {
   private project: Project;
   private mode: PlayMode = "song";
   private patternId: string | null = null;
+  private layers: string[] = [];
   private graph?: Graph;
   private click?: Tone.Synth;
   private onStep: (step: number) => void = () => {};
@@ -47,9 +48,9 @@ export class Engine {
 
     new Tone.Loop((time) => {
       const p = this.project;
-      const total = loopLength(p, this.mode, this.patternId);
+      const total = loopLength(p, this.mode, this.patternId, this.layers);
       const step = stepFromTicks(transport.getTicksAtTime(time), transport.PPQ, total);
-      this.graph?.play(p, eventsAt(p, this.mode, this.patternId, step), step, time);
+      this.graph?.play(p, eventsAt(p, this.mode, this.patternId, step, this.layers), step, time);
       if (this.metronome) this.tick(step, time);
       // Stop and pause land a look-ahead after they are pressed, so a step
       // can still be queued; only draw it while actually playing.
@@ -74,10 +75,28 @@ export class Engine {
     this.graph?.sync(project);
   }
 
-  /** Pattern mode loops one pattern; Song mode plays the playlist. */
-  setSource(mode: PlayMode, patternId: string | null): void {
+  /**
+   * Pattern mode loops one pattern (plus any backing layers); Song mode plays
+   * the playlist.
+   */
+  setSource(mode: PlayMode, patternId: string | null, layers: string[] = []): void {
     this.mode = mode;
     this.patternId = patternId;
+    this.layers = layers;
+  }
+
+  /** How long the transport loops right now, in steps. */
+  loopSteps(): number {
+    return loopLength(this.project, this.mode, this.patternId, this.layers);
+  }
+
+  /**
+   * While recording, turn every channel except the one being played down to
+   * `level` (0..1), so the backing sits under your playing. Null restores it.
+   */
+  setBacking(keepChannelId: string | null, level = 1): void {
+    this.graph?.setBacking(keepChannelId, level);
+    this.graph?.sync(this.project);
   }
 
   /** Jump to a step (used by clicking the playlist ruler). */

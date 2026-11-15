@@ -18,6 +18,7 @@ export interface Graph {
   noteOn(channelId: string, pitch: number, velocity: number, time: number): void;
   noteOff(channelId: string, pitch: number, time: number): void;
   sync(project: Project): void;
+  setBacking(keepChannelId: string | null, level: number): void;
   silence(time?: number): void;
   dispose(): void;
 }
@@ -56,6 +57,7 @@ export function createGraph(project: Project): Graph {
   const limiter = new Tone.Limiter(-1).toDestination();
   const master = new Tone.Gain(0.85).connect(limiter);
   const slots = new Map<string, Slot>();
+  let backing: { keep: string; level: number } | null = null;
 
   function makeVoice(ch: Channel, strip: Tone.Channel): Slot {
     if (ch.kind === "drum") {
@@ -108,7 +110,8 @@ export function createGraph(project: Project): Graph {
         }
         // Synth strips stay open for live playing even when another channel is
         // soloed; the sequencer itself skips channels that are not audible.
-        setStrip(slot.strip, ch.volume, ch.kind === "synth" ? !ch.muted : audible.has(ch.id));
+        const ducked = backing && ch.id !== backing.keep ? backing.level : 1;
+        setStrip(slot.strip, ch.volume * ducked, ch.kind === "synth" ? !ch.muted : audible.has(ch.id));
       }
       for (const [id, slot] of slots) {
         if (keep.has(id)) continue;
@@ -116,6 +119,9 @@ export function createGraph(project: Project): Graph {
         slot.strip.dispose();
         slots.delete(id);
       }
+    },
+    setBacking(keep, level) {
+      backing = keep === null ? null : { keep, level: Math.min(1, Math.max(0, level)) };
     },
     silence(time) {
       slots.forEach((s) => s.synth?.releaseAll(time));

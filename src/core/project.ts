@@ -441,6 +441,25 @@ export function addTrack(p: Project): Project {
   return { ...p, tracks: Math.min(MAX_TRACKS, p.tracks + 1) };
 }
 
+/**
+ * The patterns that play alongside a pattern in the song: everything playing
+ * at the moment its first clip starts. Used as the default backing when you
+ * record, so you hear what the melody will sit with. Falls back to the first
+ * drum loop when the pattern is not placed or plays alone.
+ */
+export function playsAlongside(p: Project, patternId: string): string[] {
+  const first = p.clips.filter((c) => c.patternId === patternId).sort((a, b) => a.start - b.start)[0];
+  const ids = first
+    ? p.clips
+        .filter((c) => c.patternId !== patternId && c.start <= first.start && first.start < c.start + c.length)
+        .map((c) => c.patternId)
+    : [];
+  const unique = [...new Set(ids)];
+  if (unique.length) return unique;
+  const drums = p.patterns.find((x) => x.kind === "drums");
+  return drums ? [drums.id] : [];
+}
+
 /** Song length: the end of the last clip, rounded up to a whole bar, at least one bar. */
 export function songSteps(p: Project): number {
   const bar = stepsPerBar(p.timeSig);
