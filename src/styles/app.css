@@ -726,6 +726,18 @@ input[type="range"] {
 [data-sound="bass"] { --c: var(--c-m2); }
 [data-sound="pluck"] { --c: var(--c-pluck); }
 [data-sound="pad"] { --c: var(--c-pad); }
+[data-sound="keys"] { --c: #f0a8d0; }
+[data-sound="piano"] { --c: #e8e2d4; }
+[data-sound="strings"] { --c: #d9a066; }
+[data-sound="brass"] { --c: #f2c94c; }
+[data-sound="bell"] { --c: #7fe3e8; }
+[data-sound="organ"] { --c: #c48bff; }
+[data-sound="supersaw"] { --c: #ff6fd8; }
+[data-sound="marimba"] { --c: #e09a5f; }
+[data-sound="flute"] { --c: #9fe8b0; }
+[data-sound="sub"] { --c: #ff9966; }
+[data-sound="reese"] { --c: #6fa8ff; }
+[data-sound="chip"] { --c: #b8f04a; }
 [data-sound="drums"] { --c: var(--c-drums); }
 
 /* ---------- Workspace: channels and patterns beside the playlist ---------- */
