@@ -121,6 +121,20 @@ const files = createFileBar({
     downloadBlob(blob, name);
     toast.show(`Saved ${name}.`);
   },
+  async exportWav() {
+    const p = store.get().project;
+    toast.show("Rendering the loop. Long, slow loops take a few seconds.");
+    try {
+      // Loaded on first use so the main bundle stays small.
+      const { renderLoopWav } = await import("./audio/render");
+      const blob = await renderLoopWav(p);
+      const name = `steplab-${p.bpm}bpm-${p.bars}bar${p.bars > 1 ? "s" : ""}.wav`;
+      downloadBlob(blob, name);
+      toast.show(`Exported ${name}.`);
+    } catch {
+      toast.show("The WAV export failed in this browser.", "error");
+    }
+  },
 });
 
 engine.setStepListener((step) => {
