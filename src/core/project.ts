@@ -58,7 +58,46 @@ export function demoProject(): Project {
   on("chat", [0, 2, 4, 6, 8, 10, 12]);
   on("ohat", [14]);
   on("clap", [12]);
+  // A short C minor hook on the lead and a bass line under it.
+  const lead = p.melodies[0]!;
+  for (const [step, row] of [[2, 7], [4, 10], [7, 12], [10, 10], [12, 7]] as const) {
+    lead.notes[step] = [row];
+  }
+  const bass = p.melodies[1]!;
+  for (const [step, row] of [[0, 12], [3, 12], [6, 15], [10, 19], [14, 17]] as const) {
+    bass.notes[step] = [row];
+  }
   return p;
+}
+
+export function toggleNote(project: Project, track: number, step: number, row: number): Project {
+  return {
+    ...project,
+    melodies: project.melodies.map((m, i) => {
+      if (i !== track) return m;
+      return {
+        ...m,
+        notes: m.notes.map((rows, s) => {
+          if (s !== step) return rows;
+          return rows.includes(row) ? rows.filter((r) => r !== row) : [...rows, row].sort((a, b) => a - b);
+        }),
+      };
+    }),
+  };
+}
+
+export function setSynth(project: Project, track: number, synth: SynthId): Project {
+  return {
+    ...project,
+    melodies: project.melodies.map((m, i) => (i === track ? { ...m, synth } : m)),
+  };
+}
+
+export function clearMelody(project: Project, track: number): Project {
+  return {
+    ...project,
+    melodies: project.melodies.map((m, i) => (i === track ? { ...m, notes: emptyNotes() } : m)),
+  };
 }
 
 export function toggleDrumStep(project: Project, track: number, step: number): Project {
