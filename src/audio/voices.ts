@@ -12,6 +12,10 @@ export interface LightPolyOptions {
   oscillator: LightOscillator;
   envelope: LightEnvelope;
   volume: number;
+  /** Each note starts `cents` away from its pitch and slides into it, settling in about `time` seconds. */
+  bend?: { cents: number; time: number };
+  /** Play every note this many semitones away, for a sub-octave layer. */
+  transpose?: number;
 }
 
 /** Tone's PolySynth stops at 32 voices and drops notes past that; this does the same. */
@@ -50,6 +54,8 @@ export class LightPoly {
   private readonly waves: (PeriodicWave | null)[];
   private readonly level: number;
   private envelope: LightEnvelope;
+  private readonly bend?: { cents: number; time: number };
+  private readonly ratio: number;
   private voices: Voice[] = [];
   private readonly sampleTime = 1 / this.context.sampleRate;
 
@@ -59,6 +65,8 @@ export class LightPoly {
       volume: options.volume,
     });
     this.envelope = { ...options.envelope };
+    this.bend = options.bend;
+    this.ratio = 2 ** ((options.transpose ?? 0) / 12);
     this.plan = oscillatorLayers(options.oscillator);
     this.level = Tone.dbToGain(this.plan.levelDb);
     let cache = waveCache.get(this.context.rawContext);
@@ -138,8 +146,14 @@ export class LightPoly {
       const wave = this.waves[i];
       if (wave) osc.setPeriodicWave(wave);
       else osc.type = layer.type as OscillatorType;
-      osc.frequency.value = freq;
-      osc.detune.value = layer.detune;
+      osc.frequency.value = freq * this.ratio;
+      if (this.bend) {
+        // The swoop: start off pitch and glide in, about 95% there after `time`.
+        osc.detune.setValueAtTime(layer.detune + this.bend.cents, time);
+        osc.detune.setTargetAtTime(layer.detune, time, this.bend.time / 3);
+      } else {
+        osc.detune.value = layer.detune;
+      }
       Tone.connect(osc, env);
       osc.start(time);
       return osc;

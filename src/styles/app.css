@@ -844,6 +844,15 @@ input[type="range"] {
 [data-sound="tom808"] { --c: var(--c-tom); }
 [data-sound="rim"] { --c: #c9d2e6; }
 [data-sound="cowbell"] { --c: #e8cf5a; }
+[data-sound="kick909"] { --c: var(--c-kick); }
+[data-sound="snare909"] { --c: var(--c-snare); }
+[data-sound="hat909"] { --c: var(--c-chat); }
+[data-sound="ohat909"] { --c: var(--c-ohat); }
+[data-sound="clap909"] { --c: var(--c-clap); }
+[data-sound="tom909"] { --c: var(--c-tom); }
+[data-sound="rim909"] { --c: #c9d2e6; }
+[data-sound="crash909"] { --c: #f5e6a8; }
+[data-sound="ride909"] { --c: #d7c27a; }
 [data-sound="b808"] { --c: #ff7e4a; }
 [data-sound="lead"] { --c: var(--c-m1); }
 [data-sound="bass"] { --c: var(--c-m2); }
@@ -861,6 +870,7 @@ input[type="range"] {
 [data-sound="sub"] { --c: #ff9966; }
 [data-sound="reese"] { --c: #6fa8ff; }
 [data-sound="chip"] { --c: #b8f04a; }
+[data-sound="hoover"] { --c: #c77dff; }
 [data-sound="drums"] { --c: var(--c-drums); }
 
 /* ---------- Workspace: channels and patterns beside the playlist ---------- */

@@ -131,10 +131,50 @@ function bass808(): Instrument {
   };
 }
 
+/**
+ * The Hoover: the rave sound first heard on a Roland Alpha Juno in 1991.
+ * Detuned saws with a sub an octave down, every note swooping up into pitch,
+ * then a deep, wide chorus that makes it sound like a crowd of synths. Big
+ * for chords and stabs, and for bass lines played low.
+ */
+function hoover(): Instrument {
+  const base = { attack: 0.02, release: 0.35 };
+  const envelope = { attack: base.attack, decay: 0.4, sustain: 0.75, release: base.release };
+  const bend = { cents: -1000, time: 0.14 };
+  const saws = new LightPoly({ oscillator: { type: "fatsawtooth", count: 3, spread: 38 }, envelope, volume: -19, bend });
+  const sub = new LightPoly({ oscillator: { type: "sawtooth" }, envelope, volume: -21, bend, transpose: -12 });
+  const chorus = new Tone.Chorus({ frequency: 0.8, delayTime: 4, depth: 0.8, spread: 180, wet: 0.55 }).start();
+  const filter = new Tone.BiquadFilter({ type: "lowpass", frequency: 3800, Q: 0.8 });
+  const tone = shaper();
+  saws.connect(chorus);
+  sub.connect(chorus);
+  chorus.chain(filter, tone);
+  const both = (fn: (v: LightPoly) => void) => {
+    fn(saws);
+    fn(sub);
+  };
+  return {
+    output: tone,
+    play: (midi, seconds, time, velocity) => both((v) => v.triggerAttackRelease(midiToFreq(midi), seconds, time, velocity)),
+    attack: (midi, time, velocity) => both((v) => v.triggerAttack(midiToFreq(midi), time, velocity)),
+    release: (midi, time) => both((v) => v.triggerRelease(midiToFreq(midi), time)),
+    releaseAll: (time) => both((v) => v.releaseAll(time)),
+    setTone(t) {
+      applyFilter(tone, t);
+      both((v) => v.set({ envelope: { attack: base.attack * envelopeScale(t.attack), release: base.release * envelopeScale(t.release) } }));
+    },
+    dispose: () => {
+      both((v) => v.dispose());
+      [chorus, filter, tone].forEach((n) => n.dispose());
+    },
+  };
+}
+
 const lowpass = (frequency: number, Q = 0.7) => () => [new Tone.BiquadFilter({ type: "lowpass", frequency, Q })];
 
 const builders: Record<SynthId, () => Instrument> = {
   b808: bass808,
+  hoover,
 
   // Detuned saws through a low-pass filter: bright but not harsh.
   lead: light({

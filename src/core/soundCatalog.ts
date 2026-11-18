@@ -1,6 +1,6 @@
 import { SYNTHS } from "./notes";
 import { DRUM_NAMES } from "./project";
-import { CLASSIC_DRUMS, DRUMS_808, SYNTH_IDS, type DrumId, type SynthId } from "./types";
+import { CLASSIC_DRUMS, DRUMS_808, DRUMS_909, SYNTH_IDS, type DrumId, type SynthId } from "./types";
 
 /**
  * Everything you can add as a channel, in one list for the sound browser:
@@ -49,6 +49,7 @@ export function soundCatalog(library: LibraryEntry[]): SoundItem[] {
   });
   return [
     ...DRUMS_808.map((d) => drum(d, "808 kit")),
+    ...DRUMS_909.map((d) => drum(d, "909 kit")),
     ...CLASSIC_DRUMS.map((d) => drum(d, "Classic kit")),
     ...SYNTH_IDS.map(
       (s): SoundItem => ({ id: `synth:${s}`, name: SYNTHS[s].name, section: "Synths", category: "synths", kind: "synth", sound: s, home: SYNTHS[s].home }),

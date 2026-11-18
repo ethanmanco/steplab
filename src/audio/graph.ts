@@ -54,7 +54,7 @@ export type SampleSource = (id: string) => AudioBuffer | undefined;
 
 /** Notes end a hair before their last step so repeated notes stay distinct. */
 const NOTE_FILL = 0.92;
-const CHOKES: Partial<Record<string, string>> = { chat: "ohat", hat808: "ohat808" };
+const CHOKES: Partial<Record<string, string>> = { chat: "ohat", hat808: "ohat808", hat909: "ohat909" };
 const DELAY_BEATS: Record<DelayTime, number> = { "16n": 0.25, "8n": 0.5, "8n.": 0.75, "4n": 1 };
 /** How long the reverb lingers after the last send is turned off, so its tail is not cut. */
 const REVERB_TAIL_MS = 8000;

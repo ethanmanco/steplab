@@ -29,6 +29,7 @@ export const SYNTHS: Record<SynthId, SynthInfo> = {
   sub: { name: "Sub bass", home: 36 },
   reese: { name: "Reese bass", home: 36 },
   chip: { name: "Chiptune", home: 72 },
+  hoover: { name: "Hoover", home: 48 },
 };
 
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;

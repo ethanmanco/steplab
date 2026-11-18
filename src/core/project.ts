@@ -43,6 +43,15 @@ export const DRUM_NAMES: Record<DrumId, string> = {
   tom808: "808 Tom",
   rim: "Rimshot",
   cowbell: "Cowbell",
+  kick909: "909 Kick",
+  snare909: "909 Snare",
+  hat909: "909 Closed hat",
+  ohat909: "909 Open hat",
+  clap909: "909 Clap",
+  tom909: "909 Tom",
+  rim909: "909 Rimshot",
+  crash909: "909 Crash",
+  ride909: "909 Ride",
 };
 
 /** The drum channels a new song starts with: an 808 kit. */

@@ -2,7 +2,9 @@
 export const CLASSIC_DRUMS = ["kick", "snare", "chat", "ohat", "clap", "tom"] as const;
 /** Sounds modeled on the Roland TR-808 drum machine, all synthesized. */
 export const DRUMS_808 = ["kick808", "snare808", "hat808", "ohat808", "clap808", "tom808", "rim", "cowbell"] as const;
-export const DRUM_IDS = [...CLASSIC_DRUMS, ...DRUMS_808] as const;
+/** Sounds modeled on the Roland TR-909, the house and techno machine, all synthesized. */
+export const DRUMS_909 = ["kick909", "snare909", "hat909", "ohat909", "clap909", "tom909", "rim909", "crash909", "ride909"] as const;
+export const DRUM_IDS = [...CLASSIC_DRUMS, ...DRUMS_808, ...DRUMS_909] as const;
 export type DrumId = (typeof DRUM_IDS)[number];
 
 export const SYNTH_IDS = [
@@ -23,6 +25,7 @@ export const SYNTH_IDS = [
   "sub",
   "reese",
   "chip",
+  "hoover",
 ] as const;
 export type SynthId = (typeof SYNTH_IDS)[number];
 

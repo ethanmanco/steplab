@@ -15,7 +15,7 @@ export interface SidebarActions {
   setMute(id: string, muted: boolean): void;
   setSolo(id: string, solo: boolean): void;
   setVolume(id: string, volume: number): void;
-  addKit808(): void;
+  addKit(kit: "808" | "909"): void;
   newDrums(): void;
   newMelody(): void;
   selectPattern(id: string): void;
@@ -86,7 +86,8 @@ export function createSidebar(actions: SidebarActions) {
       "div",
       { class: "side-add" },
       addBtn,
-      h("button", { type: "button", class: "btn btn-small", title: "Add any 808 kit sounds this song does not have yet", onclick: () => actions.addKit808() }, "Add 808 kit"),
+      h("button", { type: "button", class: "btn btn-small", title: "Add any 808 kit sounds this song does not have yet", onclick: () => actions.addKit("808") }, "Add 808 kit"),
+      h("button", { type: "button", class: "btn btn-small", title: "Add any 909 kit sounds this song does not have yet", onclick: () => actions.addKit("909") }, "Add 909 kit"),
     ),
   );
   const rack = h(

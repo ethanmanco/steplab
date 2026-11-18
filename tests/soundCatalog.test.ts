@@ -16,6 +16,13 @@ describe("soundCatalog", () => {
     expect(all[0]).toMatchObject({ id: "drum:kick808", section: "808 kit", kind: "drum" });
   });
 
+  it("lists the 909 kit after the 808 kit, and the Hoover with the synths", () => {
+    const sections = [...new Set(all.map((x) => x.section))];
+    expect(sections.slice(0, 3)).toEqual(["808 kit", "909 kit", "Classic kit"]);
+    expect(all.filter((x) => x.section === "909 kit")).toHaveLength(9);
+    expect(all.find((x) => x.id === "synth:hoover")).toMatchObject({ name: "Hoover", kind: "synth", home: 48 });
+  });
+
   it("makes one-shot samples drum channels and melodic samples synth channels", () => {
     const kick = all.find((x) => x.id === "lib:ac-kick")!;
     const piano = all.find((x) => x.id === "lib:grand-piano")!;

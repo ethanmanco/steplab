@@ -55,7 +55,7 @@ import { positionInPattern, recordedNote } from "./core/record";
 import { clipAt } from "./core/schedule";
 import { parseProject, serializeProject } from "./core/serialize";
 import { decodeMidi, encodeMidi, importMidi, projectToMidi } from "./core/midifile";
-import { DRUMS_808, type Channel, type DrumId, type MelodyPattern, type Project, type SynthId } from "./core/types";
+import { DRUMS_808, DRUMS_909, type Channel, type DrumId, type MelodyPattern, type Project, type SynthId } from "./core/types";
 import { connectMidi } from "./midi";
 import { debounce, getStorage, loadAutosave, loadPrefs, saveAutosave, savePrefs } from "./storage";
 import { h } from "./ui/dom";
@@ -452,15 +452,15 @@ const sidebar = createSidebar({
   setChannelSound: (id, sound) => edit((p) => setChannelSound(p, id, sound)),
   openSettings: (id) => store.set({ openChannel: id }),
   openSounds: () => store.set({ soundsOpen: true }),
-  addKit808() {
+  addKit(kit) {
     const have = new Set(project().channels.filter((c) => c.kind === "drum").map((c) => c.sound));
-    const missing = DRUMS_808.filter((d) => !have.has(d));
+    const missing = (kit === "808" ? DRUMS_808 : DRUMS_909).filter((d) => !have.has(d));
     if (!missing.length) {
-      toast.show("This song already has every 808 kit sound.");
+      toast.show(`This song already has every ${kit} kit sound.`);
       return;
     }
     edit((p) => missing.reduce((acc, d) => addChannel(acc, drumChannel(d)), p));
-    toast.show(`Added ${missing.length} 808 sound${missing.length === 1 ? "" : "s"} to the channel rack.`);
+    toast.show(`Added ${missing.length} ${kit} sound${missing.length === 1 ? "" : "s"} to the channel rack.`);
   },
   newDrums() {
     const { project: withPattern, id } = addDrumPattern(project());

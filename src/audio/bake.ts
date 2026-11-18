@@ -32,10 +32,30 @@ const LENGTH: Record<DrumId, number> = {
   tom808: 0.75,
   rim: 0.15,
   cowbell: 0.55,
+  kick909: 0.8,
+  snare909: 0.4,
+  hat909: 0.12,
+  ohat909: 0.6,
+  clap909: 0.45,
+  tom909: 0.6,
+  rim909: 0.1,
+  crash909: 2.0,
+  ride909: 1.6,
 };
 
 /** Takes per drum. Drums made of noise sound different on every hit, so they get several. */
-const TAKES: Partial<Record<DrumId, number>> = { snare: 3, clap: 3, snare808: 3, clap808: 3 };
+const TAKES: Partial<Record<DrumId, number>> = {
+  snare: 3,
+  clap: 3,
+  snare808: 3,
+  clap808: 3,
+  snare909: 3,
+  clap909: 3,
+  hat909: 3,
+  ohat909: 2,
+  crash909: 2,
+  ride909: 2,
+};
 
 const baked = new Map<DrumId, AudioBuffer[]>();
 const queued = new Set<DrumId>();

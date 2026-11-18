@@ -71,6 +71,15 @@ export const GM_DRUM: Record<DrumId, number> = {
   tom808: 47,
   rim: 37,
   cowbell: 56,
+  kick909: 36,
+  snare909: 38,
+  hat909: 42,
+  ohat909: 46,
+  clap909: 39,
+  tom909: 48,
+  rim909: 37,
+  crash909: 49,
+  ride909: 51,
 };
 
 /** General MIDI programs closest to each synth sound. */
@@ -92,6 +101,7 @@ export const GM_PROGRAM: Record<SynthId, number> = {
   sub: 38,
   reese: 39,
   chip: 80,
+  hoover: 87,
 };
 
 /** The Steplab sound nearest a General MIDI program, for imports. */
